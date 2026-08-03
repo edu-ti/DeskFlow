@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: deskflow_db
+    environment:
+      POSTGRES_USER: deskflow
+      POSTGRES_PASSWORD: deskflow_password
+      POSTGRES_DB: deskflow_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - deskflow_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  deskflow_pgdata:
