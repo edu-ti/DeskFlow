@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from '../../iam/entities/user.entity';
 import { Group } from '../../iam/entities/group.entity';
+import { Article } from './article.entity';
 
 @Entity('tickets')
 export class Ticket {
@@ -33,6 +34,9 @@ export class Ticket {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'owner_id' })
   owner: User;
+
+  @OneToMany(() => Article, article => article.ticket)
+  articles: Article[];
 
   @CreateDateColumn()
   created_at: Date;

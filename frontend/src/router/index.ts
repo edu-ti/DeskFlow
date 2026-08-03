@@ -14,12 +14,20 @@ const router = createRouter({
     {
       path: '/',
       component: DashboardLayout,
-      redirect: '/tickets',
       children: [
+        {
+          path: '',
+          redirect: '/tickets'
+        },
         {
           path: 'tickets',
           name: 'tickets',
           component: TicketsView,
+        },
+        {
+          path: 'tickets/:id',
+          name: 'ticket-detail',
+          component: () => import('../views/TicketDetailView.vue'),
         }
       ]
     },

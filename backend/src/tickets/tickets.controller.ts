@@ -15,6 +15,11 @@ export class TicketsController {
     return this.ticketService.findAll();
   }
 
+  @Get(':id')
+  async getTicket(@Param('id', ParseIntPipe) id: number) {
+    return this.ticketService.findOne(id);
+  }
+
   @Post()
   async createTicket(@Body() createTicketDto: CreateTicketDto) {
     const { initial_article_body, ...ticketData } = createTicketDto;

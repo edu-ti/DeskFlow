@@ -31,7 +31,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="ticket in tickets" :key="ticket.id" class="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
+          <tr 
+            v-for="ticket in tickets" 
+            :key="ticket.id" 
+            @click="router.push(`/tickets/${ticket.id}`)"
+            class="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+          >
             <td class="py-4 px-6 text-sm text-df-text-muted">#{{ ticket.id }}</td>
             <td class="py-4 px-6 text-sm font-medium text-df-text">{{ ticket.title }}</td>
             <td class="py-4 px-6 text-sm">
@@ -111,9 +116,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Plus as PlusIcon, Inbox as InboxIcon, Loader2 as Loader2Icon, X as XIcon } from 'lucide-vue-next'
 import { ticketService } from '../services/ticketService'
 
+const router = useRouter()
 const tickets = ref<any[]>([])
 const isLoading = ref(true)
 const showCreateModal = ref(false)
