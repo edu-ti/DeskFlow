@@ -7,11 +7,15 @@ const api = axios.create({
   }
 })
 
-// Optional: Interceptor to add mock auth tokens later
-// api.interceptors.request.use((config) => {
-//   const token = localStorage.getItem('token')
-//   if (token) config.headers.Authorization = `Bearer ${token}`
-//   return config
-// })
+// Adiciona o token JWT em todas as requisições
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
 
 export default api

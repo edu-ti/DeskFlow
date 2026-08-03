@@ -1,14 +1,23 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { JwtModule } from '@nestjs/jwt';
 import { User } from './entities/user.entity';
 import { Group } from './entities/group.entity';
 import { IamService } from './services/iam.service';
+import { AuthService } from './services/auth.service';
 import { IamController } from './iam.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Group])],
+  imports: [
+    TypeOrmModule.forFeature([User, Group]),
+    JwtModule.register({
+      global: true,
+      secret: 'deskflow-super-secret-key-change-in-prod', // MUST be in env!
+      signOptions: { expiresIn: '1d' },
+    }),
+  ],
   controllers: [IamController],
-  providers: [IamService],
-  exports: [IamService, TypeOrmModule],
+  providers: [IamService, AuthService],
+  exports: [IamService, AuthService, TypeOrmModule],
 })
 export class IamModule {}

@@ -35,6 +35,17 @@
         </div>
       </div>
       
+      <div v-else class="glass-panel p-6 rounded-2xl flex flex-col items-center justify-center text-center">
+        <div class="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mb-4">
+          <XIcon class="w-6 h-6" />
+        </div>
+        <h3 class="text-lg font-medium text-df-text">Ticket Not Found</h3>
+        <p class="text-sm text-df-text-muted mt-2">This ticket may have been deleted or does not exist.</p>
+        <button @click="router.push('/tickets')" class="mt-6 text-df-primary hover:text-df-primary-hover text-sm font-medium">
+          &larr; Back to Tickets
+        </button>
+      </div>
+
       <div class="flex-1"></div> <!-- Spacer -->
     </div>
 
@@ -76,6 +87,11 @@
             </div>
           </div>
         </template>
+        
+        <div v-else class="flex flex-col items-center justify-center h-full text-center text-df-text-muted">
+          <MessageSquareIcon class="w-12 h-12 mb-4 opacity-20" />
+          <p>Conversation unavailable.</p>
+        </div>
       </div>
 
       <!-- Reply Box -->
