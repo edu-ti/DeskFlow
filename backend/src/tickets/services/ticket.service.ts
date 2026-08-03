@@ -31,6 +31,10 @@ export class TicketService {
     return savedTicket;
   }
 
+  async findAll(): Promise<Ticket[]> {
+    return this.ticketRepository.find({ order: { created_at: 'DESC' } });
+  }
+
   async addArticle(ticketId: number, body: string, type: string = 'note'): Promise<Article> {
     const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
     if (!ticket) {
