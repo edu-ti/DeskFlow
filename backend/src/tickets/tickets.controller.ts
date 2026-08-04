@@ -23,7 +23,7 @@ export class TicketsController {
   }
 
   @Post()
-  async createTicket(@Body() createTicketDto: CreateTicketDto, @Request() req) {
+  async createTicket(@Body() createTicketDto: CreateTicketDto, @Request() req: any) {
     const { initial_article_body, ...ticketData } = createTicketDto;
     
     // Ler o customer_id logado

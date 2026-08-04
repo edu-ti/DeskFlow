@@ -38,7 +38,10 @@ export class TicketService {
   async findOne(id: number): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({
       where: { id },
-      relations: ['customer', 'articles'],
+      relations: {
+        customer: true,
+        articles: true
+      },
       order: {
         articles: {
           created_at: 'ASC'

@@ -5,11 +5,11 @@ async function seed() {
   const hash = await bcrypt.hash('admin123', 10);
   
   const client = new Client({
-    user: 'deskflow_user',
+    user: 'deskflow',
     host: 'localhost',
     database: 'deskflow_db',
-    password: 'password',
-    port: 5432,
+    password: 'deskflow_password',
+    port: 5434,
   });
 
   await client.connect();
