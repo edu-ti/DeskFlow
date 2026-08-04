@@ -32,6 +32,16 @@
             <label class="text-xs text-df-text-muted font-medium uppercase tracking-wider block mb-1">Created At</label>
             <p class="text-sm text-df-text">{{ new Date(ticket.created_at).toLocaleString() }}</p>
           </div>
+
+          <div v-if="ticket.firstResponseEscalationAt">
+            <label class="text-xs text-df-text-muted font-medium uppercase tracking-wider block mb-1">
+              <span v-if="ticket.isEscalated" class="text-red-400">SLA Violated</span>
+              <span v-else>SLA Target (Response)</span>
+            </label>
+            <p class="text-sm" :class="ticket.isEscalated ? 'text-red-400 font-bold' : 'text-df-text'">
+              {{ new Date(ticket.firstResponseEscalationAt).toLocaleString() }}
+            </p>
+          </div>
         </div>
       </div>
       

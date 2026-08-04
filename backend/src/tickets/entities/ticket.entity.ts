@@ -38,6 +38,18 @@ export class Ticket {
   @OneToMany(() => Article, article => article.ticket)
   articles: Article[];
 
+  @Column({ type: 'timestamp', nullable: true })
+  firstResponseEscalationAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  updateEscalationAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  solutionEscalationAt: Date;
+
+  @Column({ default: false })
+  isEscalated: boolean;
+
   @CreateDateColumn()
   created_at: Date;
 

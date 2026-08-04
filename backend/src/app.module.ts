@@ -10,6 +10,8 @@ import { Group } from './iam/entities/group.entity';
 import { Ticket } from './tickets/entities/ticket.entity';
 import { Article } from './tickets/entities/article.entity';
 
+import { BullModule } from '@nestjs/bullmq';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -25,6 +27,16 @@ import { Article } from './tickets/entities/article.entity';
         database: configService.get<string>('DB_NAME', 'deskflow_db'),
         entities: [User, Group, Ticket, Article],
         synchronize: true, // APENAS PARA DESENVOLVIMENTO: cria tabelas automaticamente
+      }),
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST', 'localhost'),
+          port: configService.get<number>('REDIS_PORT', 6380),
+        },
       }),
     }),
     IamModule, 

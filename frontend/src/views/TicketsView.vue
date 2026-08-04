@@ -35,14 +35,20 @@
             v-for="ticket in tickets" 
             :key="ticket.id" 
             @click="router.push(`/tickets/${ticket.id}`)"
-            class="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+            class="border-b transition-colors cursor-pointer"
+            :class="ticket.isEscalated ? 'border-red-500/20 bg-red-500/5 hover:bg-red-500/10' : 'border-white/5 hover:bg-white/5'"
           >
-            <td class="py-4 px-6 text-sm text-df-text-muted">#{{ ticket.id }}</td>
-            <td class="py-4 px-6 text-sm font-medium text-df-text">{{ ticket.title }}</td>
+            <td class="py-4 px-6 text-sm" :class="ticket.isEscalated ? 'text-red-400' : 'text-df-text-muted'">#{{ ticket.id }}</td>
+            <td class="py-4 px-6 text-sm font-medium" :class="ticket.isEscalated ? 'text-red-100' : 'text-df-text'">
+              {{ ticket.title }}
+              <span v-if="ticket.isEscalated" class="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/20 uppercase tracking-wider">
+                <AlertCircleIcon class="w-3 h-3" /> SLA
+              </span>
+            </td>
             <td class="py-4 px-6 text-sm">
               <span class="px-2.5 py-1 bg-df-accent/20 text-df-accent rounded-full text-xs font-medium">Open</span>
             </td>
-            <td class="py-4 px-6 text-sm text-df-text-muted">{{ new Date(ticket.created_at).toLocaleDateString() }}</td>
+            <td class="py-4 px-6 text-sm" :class="ticket.isEscalated ? 'text-red-400/80' : 'text-df-text-muted'">{{ new Date(ticket.created_at).toLocaleDateString() }}</td>
           </tr>
         </tbody>
       </table>
@@ -117,7 +123,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus as PlusIcon, Inbox as InboxIcon, Loader2 as Loader2Icon, X as XIcon } from 'lucide-vue-next'
+import { Plus as PlusIcon, Inbox as InboxIcon, Loader2 as Loader2Icon, X as XIcon, AlertCircle as AlertCircleIcon } from 'lucide-vue-next'
 import { ticketService } from '../services/ticketService'
 
 const router = useRouter()
