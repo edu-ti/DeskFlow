@@ -33,22 +33,49 @@ const router = createRouter({
           path: 'tickets/:id',
           name: 'ticket-detail',
           component: () => import('../views/TicketDetailView.vue'),
+        },
+        {
+          path: 'admin/users',
+          name: 'admin-users',
+          component: () => import('../views/admin/UsersView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/groups',
+          name: 'admin-groups',
+          component: () => import('../views/admin/GroupsView.vue'),
+          meta: { requiresAdmin: true }
         }
       ]
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/LoginView.vue'),
     },
   ],
 })
 
 router.beforeEach((to, from, next) => {
-  const publicPages = ['/login']
-  const authRequired = !publicPages.includes(to.path)
-  const loggedIn = localStorage.getItem('token')
-
-  if (authRequired && !loggedIn) {
-    return next('/login')
+  const token = localStorage.getItem('token')
+  const userStr = localStorage.getItem('user')
+  
+  if (to.name !== 'login' && !token) {
+    next({ name: 'login' })
+  } else if (to.meta.requiresAdmin) {
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      if (user.roles && user.roles.includes('admin')) {
+        next()
+      } else {
+        next({ name: 'dashboard' }) // Redirect non-admins away
+      }
+    } else {
+      next({ name: 'login' })
+    }
+  } else {
+    next()
   }
-
-  next()
 })
 
 export default router

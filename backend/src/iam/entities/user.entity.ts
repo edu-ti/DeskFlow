@@ -1,4 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToMany, JoinTable } from 'typeorm';
+import { Role } from './role.entity';
+import { Group } from './group.entity';
 
 @Entity('users')
 export class User {
@@ -25,4 +27,12 @@ export class User {
 
   @UpdateDateColumn()
   updated_at: Date;
+
+  @ManyToMany(() => Role, { cascade: true })
+  @JoinTable({ name: 'user_roles' })
+  roles: Role[];
+
+  @ManyToMany(() => Group, { cascade: true })
+  @JoinTable({ name: 'user_groups' })
+  groups: Group[];
 }

@@ -26,4 +26,9 @@ export class IamController {
   async getGroups() {
     return this.iamService.getGroups();
   }
+
+  @Get('roles')
+  async getRoles() {
+    return this.iamService.getRoles();
+  }
 }

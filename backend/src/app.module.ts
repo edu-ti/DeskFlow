@@ -9,8 +9,8 @@ import { User } from './iam/entities/user.entity';
 import { Group } from './iam/entities/group.entity';
 import { Ticket } from './tickets/entities/ticket.entity';
 import { Article } from './tickets/entities/article.entity';
-
 import { BullModule } from '@nestjs/bullmq';
+import { Role } from './iam/entities/role.entity';
 
 @Module({
   imports: [
@@ -25,7 +25,7 @@ import { BullModule } from '@nestjs/bullmq';
         username: configService.get<string>('DB_USER', 'deskflow'),
         password: configService.get<string>('DB_PASS', 'deskflow_password'),
         database: configService.get<string>('DB_NAME', 'deskflow_db'),
-        entities: [User, Group, Ticket, Article],
+        entities: [User, Group, Role, Ticket, Article],
         synchronize: true, // APENAS PARA DESENVOLVIMENTO: cria tabelas automaticamente
       }),
     }),
