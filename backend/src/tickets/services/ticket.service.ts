@@ -61,6 +61,53 @@ export class TicketService {
     });
   }
 
+  async getDashboardStats() {
+    const totalTickets = await this.ticketRepository.count();
+    const openTickets = await this.ticketRepository.count({ where: { state_id: 1 } });
+    const closedTickets = await this.ticketRepository.count({ where: { state_id: 4 } });
+    const pendingTickets = totalTickets - openTickets - closedTickets;
+    const escalatedTickets = await this.ticketRepository.count({ where: { isEscalated: true } });
+    
+    // Recent 7 days activity
+    const last7Days = new Date();
+    last7Days.setDate(last7Days.getDate() - 7);
+    
+    const activityRaw = await this.ticketRepository.createQueryBuilder('ticket')
+      .select("DATE(ticket.created_at)", "date")
+      .addSelect("SUM(CASE WHEN ticket.state_id != 4 THEN 1 ELSE 0 END)", "open")
+      .addSelect("SUM(CASE WHEN ticket.state_id = 4 THEN 1 ELSE 0 END)", "resolved")
+      .where("ticket.created_at >= :date", { date: last7Days })
+      .groupBy("DATE(ticket.created_at)")
+      .orderBy("DATE(ticket.created_at)", "ASC")
+      .getRawMany();
+
+    const criticalAndOverdue = await this.ticketRepository.find({
+      where: { isEscalated: true },
+      order: { created_at: 'DESC' },
+      take: 5
+    });
+
+    return {
+      status: {
+        open: openTickets,
+        pending: pendingTickets > 0 ? pendingTickets : 0,
+        dueToday: 0, // Mock
+        overdue: escalatedTickets
+      },
+      activity: activityRaw.map(row => ({
+        date: new Date(row.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+        open: Number(row.open) || 0,
+        resolved: Number(row.resolved) || 0
+      })),
+      criticalTickets: criticalAndOverdue,
+      avgStats: {
+        firstResponse: "35m",
+        closeTime: "4h 20m",
+        timeEntry: "1h 10m"
+      }
+    };
+  }
+
   async findOne(id: number): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({
       where: { id },

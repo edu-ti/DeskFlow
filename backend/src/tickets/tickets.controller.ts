@@ -16,6 +16,11 @@ export class TicketsController {
     return this.ticketService.findAll();
   }
 
+  @Get('stats')
+  async getStats() {
+    return this.ticketService.getDashboardStats();
+  }
+
   @Get(':id')
   @UseGuards(TicketVisibilityGuard)
   async getTicket(@Param('id', ParseIntPipe) id: number) {

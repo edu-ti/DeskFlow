@@ -9,6 +9,15 @@
 
       <nav class="flex-1 py-6 px-3 space-y-1">
         <router-link 
+          to="/dashboard" 
+          class="flex items-center px-3 py-2.5 rounded-lg text-df-text-muted hover:text-df-text hover:bg-white/5 transition-colors group"
+          active-class="bg-df-primary/10 text-df-primary hover:text-df-primary hover:bg-df-primary/20"
+        >
+          <LayoutDashboardIcon class="w-5 h-5 mr-3" />
+          <span class="font-medium">Dashboard</span>
+        </router-link>
+
+        <router-link 
           to="/tickets" 
           class="flex items-center px-3 py-2.5 rounded-lg text-df-text-muted hover:text-df-text hover:bg-white/5 transition-colors group"
           active-class="bg-df-primary/10 text-df-primary hover:text-df-primary hover:bg-df-primary/20"
@@ -70,7 +79,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon } from 'lucide-vue-next'
+import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon, LayoutDashboard as LayoutDashboardIcon } from 'lucide-vue-next'
 
 const router = useRouter()
 

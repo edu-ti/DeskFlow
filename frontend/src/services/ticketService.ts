@@ -24,5 +24,10 @@ export const ticketService = {
   async addArticle(ticketId: number, body: string) {
     const response = await api.post(`/tickets/${ticketId}/articles`, { body })
     return response.data
+  },
+
+  async getDashboardStats() {
+    const response = await api.get('/tickets/stats')
+    return response.data
   }
 }

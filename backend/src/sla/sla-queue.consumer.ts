@@ -30,8 +30,9 @@ export class SlaQueueConsumer extends WorkerHost {
     const ticket = await this.ticketRepository.findOne({ where: { id: job.data.ticketId } });
     if (!ticket) return;
 
-    // Se o ticket já estiver fechado/resolvido, ignorar
-    if (ticket.status === 'closed') return;
+    // Se o ticket já estiver fechado/resolvido, ignorar (state_id = 4 é fechado na seed, etc. Por enquanto checaremos state_id)
+    // TODO: Usar tabela de estados. 4 = closed
+    if (ticket.state_id === 4) return;
 
     // Verificar se o ticket ainda precisa de escalonamento para o tipo específico
     // Ex: Se o tipo for "firstResponse" e o ticket já teve resposta, a flag firstResponseEscalationAt pode ter sido limpa ou mudada
