@@ -20,4 +20,7 @@ export class CreateTicketDto {
   @IsString()
   @IsNotEmpty()
   initial_article_body: string;
+
+  @IsOptional()
+  custom_fields?: { field_id: number, value: string }[];
 }

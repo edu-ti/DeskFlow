@@ -22,6 +22,11 @@ export class IamController {
     return this.iamService.createUser(createUserDto);
   }
 
+  @Get('users')
+  async getUsers() {
+    return this.iamService.findAllUsers();
+  }
+
   @Get('groups')
   async getGroups() {
     return this.iamService.getGroups();

@@ -2,6 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { User } from '../../iam/entities/user.entity';
 import { Group } from '../../iam/entities/group.entity';
 import { Article } from './article.entity';
+import { TicketHistory } from './ticket-history.entity';
+import { TicketCustomFieldValue } from './ticket-custom-field-value.entity';
 
 @Entity('tickets')
 export class Ticket {
@@ -37,6 +39,12 @@ export class Ticket {
 
   @OneToMany(() => Article, article => article.ticket)
   articles: Article[];
+
+  @OneToMany(() => TicketHistory, history => history.ticket)
+  history: TicketHistory[];
+
+  @OneToMany(() => TicketCustomFieldValue, customValue => customValue.ticket)
+  custom_field_values: TicketCustomFieldValue[];
 
   @Column({ type: 'timestamp', nullable: true })
   firstResponseEscalationAt: Date;

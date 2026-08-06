@@ -5,9 +5,12 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Ticket } from '../entities/ticket.entity';
 import { Article } from '../entities/article.entity';
+import { TicketHistory } from '../entities/ticket-history.entity';
+import { TicketCustomFieldValue } from '../entities/ticket-custom-field-value.entity';
 import { TicketCreatedEvent } from '../events/ticket-created.event';
 import { SLA_QUEUE_NAME, SlaJobData } from '../../sla/sla-queue.consumer';
 import { BusinessHoursUtil } from '../../sla/business-hours.util';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 @Injectable()
 export class TicketService {
@@ -16,11 +19,16 @@ export class TicketService {
     private readonly ticketRepository: Repository<Ticket>,
     @InjectRepository(Article)
     private readonly articleRepository: Repository<Article>,
+    @InjectRepository(TicketHistory)
+    private readonly historyRepository: Repository<TicketHistory>,
+    @InjectRepository(TicketCustomFieldValue)
+    private readonly customFieldValueRepository: Repository<TicketCustomFieldValue>,
     @InjectQueue(SLA_QUEUE_NAME)
     private readonly slaQueue: Queue,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
-  async createTicket(data: Partial<Ticket>, initialArticleBody: string): Promise<Ticket> {
+  async createTicket(data: Partial<Ticket>, initialArticleBody: string, customFields?: { field_id: number, value: string }[]): Promise<Ticket> {
     const now = new Date();
     
     // MVP: SLA fixo de 4 horas para primeira resposta
@@ -38,12 +46,29 @@ export class TicketService {
     });
     await this.articleRepository.save(article);
 
+    if (customFields && customFields.length > 0) {
+      const fieldValues = customFields.map(cf => this.customFieldValueRepository.create({
+        ticket_id: savedTicket.id,
+        custom_field_id: cf.field_id,
+        value: cf.value
+      }));
+      await this.customFieldValueRepository.save(fieldValues);
+    }
+
     // Adiciona o job de validação de SLA
     const delay = firstResponseAt.getTime() - now.getTime();
     await this.slaQueue.add(
       'check-first-response',
       { ticketId: savedTicket.id, escalationType: 'firstResponse' } as SlaJobData,
       { delay }
+    );
+
+    // Disparar evento de notificacao para Admins/Agents
+    await this.notificationsService.notifyAdminsAndAgents(
+      'Novo Chamado',
+      `O chamado #${savedTicket.id} foi criado.`,
+      'ticket_created',
+      savedTicket.id,
     );
 
     // TODO: Disparar evento no barramento (ex: EventEmitter2)
@@ -108,15 +133,25 @@ export class TicketService {
     };
   }
 
-  async findOne(id: number): Promise<Ticket> {
+  async findOne(id: number, user: any): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({
       where: { id },
       relations: {
         customer: true,
-        articles: true
+        owner: true,
+        articles: true,
+        history: {
+          user: true
+        },
+        custom_field_values: {
+          custom_field: true
+        }
       },
       order: {
         articles: {
+          created_at: 'ASC'
+        },
+        history: {
           created_at: 'ASC'
         }
       }
@@ -125,11 +160,16 @@ export class TicketService {
     if (!ticket) {
       throw new NotFoundException(`Ticket with ID ${id} not found`);
     }
+
+    const isAdminOrAgent = user?.roles?.includes('admin') || user?.roles?.includes('agent');
+    if (!isAdminOrAgent && ticket.articles) {
+      ticket.articles = ticket.articles.filter(article => !article.is_internal);
+    }
     
     return ticket;
   }
 
-  async addArticle(ticketId: number, body: string, type: string = 'note'): Promise<Article> {
+  async addArticle(ticketId: number, body: string, type: string = 'note', is_internal: boolean = false, actorUserId?: number): Promise<Article> {
     const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
     if (!ticket) {
       throw new NotFoundException('Ticket not found');
@@ -139,22 +179,90 @@ export class TicketService {
       ticket_id: ticketId,
       body,
       type,
+      is_internal
     });
 
-    return this.articleRepository.save(article);
+    const savedArticle = await this.articleRepository.save(article);
+
+    // Notificar cliente e agente designado, exceto quem enviou a nota
+    if (ticket.customer_id && ticket.customer_id !== actorUserId) {
+      if (!is_internal) { // Cliente nao pode ser notificado de nota interna
+        await this.notificationsService.createNotification(
+          ticket.customer_id,
+          'Nova Interação',
+          `Nova mensagem no chamado #${ticket.id}`,
+          'ticket_updated',
+          ticket.id,
+        );
+      }
+    }
+
+    if (ticket.owner_id && ticket.owner_id !== actorUserId) {
+      await this.notificationsService.createNotification(
+        ticket.owner_id,
+        'Nova Interação',
+        `Nova mensagem no chamado #${ticket.id}`,
+        'ticket_updated',
+        ticket.id,
+      );
+    }
+
+    return savedArticle;
   }
 
-  async changeState(ticketId: number, newStateId: number): Promise<Ticket> {
+  async changeState(ticketId: number, newStateId: number, actorUserId: number): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
     if (!ticket) {
       throw new NotFoundException('Ticket not found');
     }
 
-    ticket.state_id = newStateId;
-    
-    // TODO: Recalcular SLA (BR-MIGRAR-002)
+    const oldState = ticket.state_id;
+    if (oldState !== newStateId) {
+      ticket.state_id = newStateId;
+      await this.ticketRepository.save(ticket);
+      await this.addHistory(ticketId, actorUserId, 'state_id', oldState?.toString(), newStateId.toString());
+      
+      // TODO: Recalcular SLA (BR-MIGRAR-002)
+    }
 
-    return this.ticketRepository.save(ticket);
+    return ticket;
+  }
+
+  async assignTicket(ticketId: number, ownerId: number, actorUserId: number): Promise<Ticket> {
+    const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    const oldOwner = ticket.owner_id;
+    if (oldOwner !== ownerId) {
+      ticket.owner_id = ownerId;
+      await this.ticketRepository.save(ticket);
+      await this.addHistory(ticketId, actorUserId, 'owner_id', oldOwner?.toString(), ownerId.toString());
+
+      if (ownerId && ownerId !== actorUserId) {
+        await this.notificationsService.createNotification(
+          ownerId,
+          'Chamado Atribuído',
+          `O chamado #${ticket.id} foi atribuído a você.`,
+          'ticket_assigned',
+          ticket.id,
+        );
+      }
+    }
+
+    return ticket;
+  }
+
+  private async addHistory(ticketId: number, userId: number, field: string, oldValue: string, newValue: string) {
+    const history = this.historyRepository.create({
+      ticket_id: ticketId,
+      user_id: userId,
+      field,
+      old_value: oldValue,
+      new_value: newValue
+    });
+    await this.historyRepository.save(history);
   }
 
   async softDeleteTicket(ticketId: number): Promise<void> {

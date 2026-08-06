@@ -35,6 +35,16 @@ const router = createRouter({
           component: () => import('../views/TicketDetailView.vue'),
         },
         {
+          path: 'kb',
+          name: 'kb',
+          component: () => import('../views/kb/KnowledgeBaseView.vue'),
+        },
+        {
+          path: 'kb/:id',
+          name: 'kb-article',
+          component: () => import('../views/kb/ArticleDetailView.vue'),
+        },
+        {
           path: 'admin/users',
           name: 'admin-users',
           component: () => import('../views/admin/UsersView.vue'),
@@ -44,6 +54,18 @@ const router = createRouter({
           path: 'admin/groups',
           name: 'admin-groups',
           component: () => import('../views/admin/GroupsView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/custom-fields',
+          name: 'admin-custom-fields',
+          component: () => import('../views/admin/CustomFieldsView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/kb',
+          name: 'admin-kb',
+          component: () => import('../views/admin/KbAdminView.vue'),
           meta: { requiresAdmin: true }
         }
       ]

@@ -9,8 +9,16 @@ import { User } from './iam/entities/user.entity';
 import { Group } from './iam/entities/group.entity';
 import { Ticket } from './tickets/entities/ticket.entity';
 import { Article } from './tickets/entities/article.entity';
+import { TicketHistory } from './tickets/entities/ticket-history.entity';
+import { CustomField } from './tickets/entities/custom-field.entity';
+import { TicketCustomFieldValue } from './tickets/entities/ticket-custom-field-value.entity';
 import { BullModule } from '@nestjs/bullmq';
 import { Role } from './iam/entities/role.entity';
+import { Notification } from './notifications/entities/notification.entity';
+import { NotificationsModule } from './notifications/notifications.module';
+import { KbModule } from './kb/kb.module';
+import { Category as KbCategory } from './kb/entities/category.entity';
+import { Article as KbArticle } from './kb/entities/article.entity';
 
 @Module({
   imports: [
@@ -25,7 +33,7 @@ import { Role } from './iam/entities/role.entity';
         username: configService.get<string>('DB_USER', 'deskflow'),
         password: configService.get<string>('DB_PASS', 'deskflow_password'),
         database: configService.get<string>('DB_NAME', 'deskflow_db'),
-        entities: [User, Group, Role, Ticket, Article],
+        entities: [User, Group, Role, Ticket, Article, TicketHistory, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle],
         synchronize: true, // APENAS PARA DESENVOLVIMENTO: cria tabelas automaticamente
       }),
     }),
@@ -40,7 +48,9 @@ import { Role } from './iam/entities/role.entity';
       }),
     }),
     IamModule, 
-    TicketsModule
+    TicketsModule,
+    NotificationsModule,
+    KbModule
   ],
   controllers: [AppController],
   providers: [AppService],

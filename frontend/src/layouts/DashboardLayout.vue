@@ -26,6 +26,15 @@
           <span class="font-medium">All Tickets</span>
         </router-link>
         
+        <router-link 
+          to="/kb" 
+          class="flex items-center px-3 py-2.5 rounded-lg text-df-text-muted hover:text-df-text hover:bg-white/5 transition-colors group"
+          active-class="bg-df-primary/10 text-df-primary hover:text-df-primary hover:bg-df-primary/20"
+        >
+          <BookOpenIcon class="w-5 h-5 mr-3" />
+          <span class="font-medium">Knowledge Base</span>
+        </router-link>
+        
         <a href="#" class="flex items-center px-3 py-2.5 rounded-lg text-df-text-muted hover:text-df-text hover:bg-white/5 transition-colors">
           <UsersIcon class="w-5 h-5 mr-3" />
           <span class="font-medium">Customers</span>
@@ -50,6 +59,22 @@
           >
             <FolderKeyIcon class="w-5 h-5 mr-3" />
             <span class="font-medium">Groups</span>
+          </router-link>
+          <router-link 
+            to="/admin/custom-fields" 
+            class="flex items-center px-3 py-2.5 rounded-lg text-df-text-muted hover:text-df-text hover:bg-white/5 transition-colors group"
+            active-class="bg-df-primary/10 text-df-primary hover:text-df-primary hover:bg-df-primary/20"
+          >
+            <SettingsIcon class="w-5 h-5 mr-3" />
+            <span class="font-medium">Custom Fields</span>
+          </router-link>
+          <router-link 
+            to="/admin/kb" 
+            class="flex items-center px-3 py-2.5 rounded-lg text-df-text-muted hover:text-df-text hover:bg-white/5 transition-colors group"
+            active-class="bg-df-primary/10 text-df-primary hover:text-df-primary hover:bg-df-primary/20"
+          >
+            <BookOpenIcon class="w-5 h-5 mr-3" />
+            <span class="font-medium">KB Management</span>
           </router-link>
         </template>
       </nav>
@@ -83,30 +108,72 @@
           >
         </div>
         
-        <div class="flex items-center gap-4">
-          <button class="relative p-2 text-df-text-muted hover:text-white transition-colors">
+        <div class="flex items-center gap-4 relative">
+          <!-- Notification Bell -->
+          <button @click="toggleNotifications" class="relative p-2 text-df-text-muted hover:text-white transition-colors">
             <BellIcon class="w-5 h-5" />
-            <span class="absolute top-1 right-1 w-2 h-2 bg-df-accent rounded-full"></span>
+            <span v-if="notificationsStore.unreadCount > 0" class="absolute top-1 right-1 w-2.5 h-2.5 bg-df-accent rounded-full border border-df-bg"></span>
           </button>
+          
+          <!-- Notifications Dropdown -->
+          <div v-if="showNotifications" class="absolute top-12 right-0 w-80 bg-df-card border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden">
+            <div class="flex justify-between items-center p-3 border-b border-white/10 bg-white/5">
+              <span class="font-semibold text-sm text-white">Notifications</span>
+              <button @click="notificationsStore.markAllAsRead" class="text-xs text-df-primary hover:text-df-accent transition-colors">Mark all as read</button>
+            </div>
+            <div class="max-h-96 overflow-y-auto">
+              <div v-if="notificationsStore.notifications.length === 0" class="p-4 text-center text-sm text-df-text-muted">
+                No notifications
+              </div>
+              <div 
+                v-for="notification in notificationsStore.notifications" 
+                :key="notification.id"
+                @click="handleNotificationClick(notification)"
+                class="p-3 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors"
+                :class="{ 'opacity-60': notification.isRead, 'bg-df-primary/5': !notification.isRead }"
+              >
+                <div class="flex justify-between items-start mb-1">
+                  <span class="font-medium text-sm text-white">{{ notification.title }}</span>
+                  <span v-if="!notification.isRead" class="w-2 h-2 rounded-full bg-df-accent mt-1.5"></span>
+                </div>
+                <p class="text-xs text-df-text-muted line-clamp-2">{{ notification.message }}</p>
+                <span class="text-[10px] text-df-text-muted/60 mt-2 block">
+                  {{ new Date(notification.createdAt).toLocaleString() }}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
       <!-- Page Content -->
-      <div class="flex-1 overflow-auto p-8 relative">
+      <div class="flex-1 overflow-auto p-8 relative" @click="closeNotifications">
         <router-view></router-view>
       </div>
+
+      <!-- Toast Container -->
+      <ToastNotification 
+        :notification="notificationsStore.latestToast" 
+        @close="notificationsStore.clearToast" 
+      />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon, LayoutDashboard as LayoutDashboardIcon, Shield as ShieldIcon, FolderKey as FolderKeyIcon } from 'lucide-vue-next'
+import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon, LayoutDashboard as LayoutDashboardIcon, Shield as ShieldIcon, FolderKey as FolderKeyIcon, Settings as SettingsIcon, BookOpen as BookOpenIcon } from 'lucide-vue-next'
+import { socketService } from '@/services/socketService'
+import { useNotificationsStore } from '@/stores/notificationsStore'
+import ToastNotification from '@/components/ui/ToastNotification.vue'
 
 const router = useRouter()
 const isAdmin = ref(false)
 const userName = ref('')
+
+const notificationsStore = useNotificationsStore()
+const showNotifications = ref(false)
 
 onMounted(() => {
   const userStr = localStorage.getItem('user')
@@ -119,9 +186,37 @@ onMounted(() => {
       }
     } catch(e) {}
   }
+  
+  socketService.connect()
+  notificationsStore.fetchNotifications()
+})
+
+onUnmounted(() => {
+  socketService.disconnect()
 })
 
 const logout = () => {
+  socketService.disconnect()
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
   router.push('/login')
+}
+
+const toggleNotifications = () => {
+  showNotifications.value = !showNotifications.value
+}
+
+const closeNotifications = () => {
+  showNotifications.value = false
+}
+
+const handleNotificationClick = async (notification: any) => {
+  if (!notification.isRead) {
+    await notificationsStore.markAsRead(notification.id)
+  }
+  closeNotifications()
+  if (notification.ticketId) {
+    router.push(`/tickets/${notification.ticketId}`)
+  }
 }
 </script>

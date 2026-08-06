@@ -28,7 +28,7 @@ export class IamService implements OnModuleInit {
     }
     
     // Assign admin role to first user if exists and has no roles
-    const firstUser = await this.userRepository.findOne({ where: { id: 1 }, relations: ['roles'] });
+    const firstUser = await this.userRepository.findOne({ where: { id: 1 }, relations: { roles: true } });
     if (firstUser && (!firstUser.roles || firstUser.roles.length === 0)) {
       const adminRole = await this.roleRepository.findOne({ where: { name: 'admin' } });
       if (adminRole) {
@@ -50,11 +50,11 @@ export class IamService implements OnModuleInit {
   }
 
   async findUserById(id: number): Promise<User | null> {
-    return this.userRepository.findOne({ where: { id }, relations: ['roles', 'groups'] });
+    return this.userRepository.findOne({ where: { id }, relations: { roles: true, groups: true } });
   }
 
   async findAllUsers(): Promise<User[]> {
-    return this.userRepository.find({ relations: ['roles', 'groups'] });
+    return this.userRepository.find({ relations: { roles: true, groups: true } });
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {

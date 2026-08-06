@@ -8,4 +8,7 @@ export class AddArticleDto {
   @IsString()
   @IsOptional()
   type?: string;
+
+  @IsOptional()
+  is_internal?: boolean;
 }

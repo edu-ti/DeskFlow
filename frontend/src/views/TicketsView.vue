@@ -97,6 +97,31 @@
             ></textarea>
           </div>
 
+          <!-- Dynamic Custom Fields -->
+          <div v-for="field in customFields" :key="field.id">
+            <label class="block text-sm font-medium text-df-text-muted mb-2">{{ field.name }} <span v-if="field.is_required" class="text-red-400">*</span></label>
+            
+            <input 
+              v-if="field.type === 'text' || field.type === 'number'"
+              v-model="customFieldValues[field.id]" 
+              :type="field.type" 
+              class="w-full bg-df-bg/50 border border-white/10 rounded-lg py-2.5 px-4 text-df-text focus:outline-none focus:border-df-primary focus:ring-1 focus:ring-df-primary transition-colors"
+              :required="field.is_required"
+            >
+            
+            <select
+              v-else-if="field.type === 'select'"
+              v-model="customFieldValues[field.id]" 
+              class="w-full bg-[#202020] border border-white/10 rounded-lg py-2.5 px-4 text-df-text focus:outline-none focus:border-df-primary focus:ring-1 focus:ring-df-primary transition-colors"
+              :required="field.is_required"
+            >
+              <option value="" disabled selected>Select an option...</option>
+              <option v-for="opt in (field.options || '').split(',').map(s => s.trim()).filter(Boolean)" :key="opt" :value="opt">
+                {{ opt }}
+              </option>
+            </select>
+          </div>
+
           <div class="flex justify-end gap-3 mt-8">
             <button 
               type="button" 
@@ -125,6 +150,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus as PlusIcon, Inbox as InboxIcon, Loader2 as Loader2Icon, X as XIcon, AlertCircle as AlertCircleIcon } from 'lucide-vue-next'
 import { ticketService } from '../services/ticketService'
+import { customFieldsService, type CustomField } from '../services/customFieldsService'
 
 const router = useRouter()
 const tickets = ref<any[]>([])
@@ -136,6 +162,9 @@ const newTicket = ref({
   title: '',
   initial_article_body: ''
 })
+
+const customFields = ref<CustomField[]>([])
+const customFieldValues = ref<Record<number, string>>({})
 
 const fetchTickets = async () => {
   try {
@@ -151,13 +180,24 @@ const fetchTickets = async () => {
 const handleCreateTicket = async () => {
   try {
     isSubmitting.value = true
+    
+    // Prepare custom fields array
+    const fieldsToSubmit = Object.entries(customFieldValues.value)
+      .filter(([id, value]) => value !== undefined && value !== '')
+      .map(([id, value]) => ({
+        field_id: Number(id),
+        value: value as string
+      }))
+
     await ticketService.createTicket({
       title: newTicket.value.title,
-      initial_article_body: newTicket.value.initial_article_body
+      initial_article_body: newTicket.value.initial_article_body,
+      custom_fields: fieldsToSubmit
     })
     
     // Reset form and close modal
     newTicket.value = { title: '', initial_article_body: '' }
+    customFieldValues.value = {}
     showCreateModal.value = false
     
     // Refresh list
@@ -170,7 +210,12 @@ const handleCreateTicket = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   fetchTickets()
+  try {
+    customFields.value = await customFieldsService.getCustomFields()
+  } catch (error) {
+    console.error("Failed to fetch custom fields", error)
+  }
 })
 </script>

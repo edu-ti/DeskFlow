@@ -19,6 +19,9 @@ export class Article {
   @Column()
   type: string; // ex: 'note', 'email', 'phone'
 
+  @Column({ default: false })
+  is_internal: boolean;
+
   @CreateDateColumn()
   created_at: Date;
 

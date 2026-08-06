@@ -17,7 +17,7 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const user = await this.userRepository.findOne({ 
       where: { email: loginDto.email },
-      relations: ['roles']
+      relations: { roles: true }
     });
     
     if (!user) {
