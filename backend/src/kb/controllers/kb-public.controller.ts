@@ -16,15 +16,15 @@ export class KbPublicController {
   searchArticles(
     @Query('q') query: string,
     @Query('category_id') categoryId: string,
-    @Request() req
+    @Request() req: any
   ) {
-    const roles = req.user?.roles?.map(r => r.name) || [];
+    const roles = req.user?.roles?.map((r: any) => r.name) || [];
     return this.kbPublicService.searchArticles(query, categoryId ? +categoryId : undefined, roles);
   }
 
   @Get('articles/:id')
-  getArticleById(@Param('id') id: string, @Request() req) {
-    const roles = req.user?.roles?.map(r => r.name) || [];
+  getArticleById(@Param('id') id: string, @Request() req: any) {
+    const roles = req.user?.roles?.map((r: any) => r.name) || [];
     return this.kbPublicService.getArticleById(+id, roles);
   }
 }

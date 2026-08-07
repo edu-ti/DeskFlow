@@ -23,7 +23,7 @@ export class NotificationsService {
     message: string,
     type: string,
     ticketId?: number,
-  ): Promise<Notification> {
+  ): Promise<Notification | null> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) return null;
 
@@ -45,7 +45,7 @@ export class NotificationsService {
 
   async notifyAdminsAndAgents(title: string, message: string, type: string, ticketId?: number) {
     // Find all users with admin or agent roles
-    const users = await this.usersRepository.find({ relations: ['roles'] });
+    const users = await this.usersRepository.find({ relations: { roles: true } });
     const staff = users.filter((u) => u.roles && u.roles.some((r) => r.name === 'admin' || r.name === 'agent'));
 
     for (const user of staff) {

@@ -20,7 +20,7 @@ export class JwtAuthGuard implements CanActivate {
       });
       // 💡 We're assigning the payload to the request object here
       // so that we can access it in our route handlers
-      request['user'] = { id: payload.sub, email: payload.email };
+      request['user'] = { id: payload.sub, email: payload.email, roles: payload.roles || [] };
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }

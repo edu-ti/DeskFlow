@@ -53,6 +53,10 @@ export class IamService implements OnModuleInit {
     return this.userRepository.findOne({ where: { id }, relations: { roles: true, groups: true } });
   }
 
+  async findUserByEmail(email: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { email }, relations: { roles: true } });
+  }
+
   async findAllUsers(): Promise<User[]> {
     return this.userRepository.find({ relations: { roles: true, groups: true } });
   }

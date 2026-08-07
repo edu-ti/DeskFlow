@@ -76,6 +76,14 @@
             <BookOpenIcon class="w-5 h-5 mr-3" />
             <span class="font-medium">KB Management</span>
           </router-link>
+          <router-link 
+            to="/admin/macros" 
+            class="flex items-center px-3 py-2.5 rounded-lg text-df-text-muted hover:text-df-text hover:bg-white/5 transition-colors group"
+            active-class="bg-df-primary/10 text-df-primary hover:text-df-primary hover:bg-df-primary/20"
+          >
+            <PlayIcon class="w-5 h-5 mr-3" />
+            <span class="font-medium">Macros</span>
+          </router-link>
         </template>
       </nav>
 
@@ -163,7 +171,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon, LayoutDashboard as LayoutDashboardIcon, Shield as ShieldIcon, FolderKey as FolderKeyIcon, Settings as SettingsIcon, BookOpen as BookOpenIcon } from 'lucide-vue-next'
+import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon, LayoutDashboard as LayoutDashboardIcon, Shield as ShieldIcon, FolderKey as FolderKeyIcon, Settings as SettingsIcon, BookOpen as BookOpenIcon, Play as PlayIcon } from 'lucide-vue-next'
 import { socketService } from '@/services/socketService'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import ToastNotification from '@/components/ui/ToastNotification.vue'

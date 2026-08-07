@@ -22,7 +22,7 @@ const router = createRouter({
         {
           path: 'dashboard',
           name: 'dashboard',
-          component: () => import('../views/DashboardView.vue'),
+          component: () => import('../views/admin/DashboardHomeView.vue'),
         },
         {
           path: 'tickets',
@@ -66,6 +66,12 @@ const router = createRouter({
           path: 'admin/kb',
           name: 'admin-kb',
           component: () => import('../views/admin/KbAdminView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/macros',
+          name: 'admin-macros',
+          component: () => import('../views/admin/MacrosView.vue'),
           meta: { requiresAdmin: true }
         }
       ]

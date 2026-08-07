@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { Ticket } from './entities/ticket.entity';
@@ -12,6 +12,7 @@ import { TicketsController } from './tickets.controller';
 import { CustomFieldsController } from './controllers/custom-fields.controller';
 import { SLA_QUEUE_NAME, SlaQueueConsumer } from '../sla/sla-queue.consumer';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
     BullModule.registerQueue({
       name: SLA_QUEUE_NAME,
     }),
-    NotificationsModule
+    NotificationsModule,
+    forwardRef(() => EmailModule)
   ],
   controllers: [TicketsController, CustomFieldsController],
   providers: [TicketService, CustomFieldsService, SlaQueueConsumer],

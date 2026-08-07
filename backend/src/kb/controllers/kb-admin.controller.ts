@@ -43,7 +43,7 @@ export class KbAdminController {
   }
 
   @Post('articles')
-  createArticle(@Body() data: any, @Request() req) {
+  createArticle(@Body() data: any, @Request() req: any) {
     return this.kbAdminService.createArticle(data, req.user.sub);
   }
 

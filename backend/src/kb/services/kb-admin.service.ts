@@ -35,11 +35,11 @@ export class KbAdminService {
 
   // Articles
   async getArticles() {
-    return this.articleRepo.find({ relations: ['category', 'author'] });
+    return this.articleRepo.find({ relations: { category: true, author: true } });
   }
 
   async getArticleById(id: number) {
-    const article = await this.articleRepo.findOne({ where: { id }, relations: ['category', 'author'] });
+    const article = await this.articleRepo.findOne({ where: { id }, relations: { category: true, author: true } });
     if (!article) throw new NotFoundException('Article not found');
     return article;
   }

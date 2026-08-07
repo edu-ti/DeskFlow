@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -8,6 +9,7 @@ import { TicketsModule } from './tickets/tickets.module';
 import { User } from './iam/entities/user.entity';
 import { Group } from './iam/entities/group.entity';
 import { Ticket } from './tickets/entities/ticket.entity';
+
 import { Article } from './tickets/entities/article.entity';
 import { TicketHistory } from './tickets/entities/ticket-history.entity';
 import { CustomField } from './tickets/entities/custom-field.entity';
@@ -19,6 +21,10 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { KbModule } from './kb/kb.module';
 import { Category as KbCategory } from './kb/entities/category.entity';
 import { Article as KbArticle } from './kb/entities/article.entity';
+import { ReportsModule } from './reports/reports.module';
+import { MacrosModule } from './macros/macros.module';
+import { Macro } from './macros/entities/macro.entity';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -33,7 +39,7 @@ import { Article as KbArticle } from './kb/entities/article.entity';
         username: configService.get<string>('DB_USER', 'deskflow'),
         password: configService.get<string>('DB_PASS', 'deskflow_password'),
         database: configService.get<string>('DB_NAME', 'deskflow_db'),
-        entities: [User, Group, Role, Ticket, Article, TicketHistory, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle],
+        entities: [User, Group, Role, Ticket, Article, TicketHistory, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle, Macro],
         synchronize: true, // APENAS PARA DESENVOLVIMENTO: cria tabelas automaticamente
       }),
     }),
@@ -50,7 +56,11 @@ import { Article as KbArticle } from './kb/entities/article.entity';
     IamModule, 
     TicketsModule,
     NotificationsModule,
-    KbModule
+    KbModule,
+    ReportsModule,
+    MacrosModule,
+    EmailModule,
+    ScheduleModule.forRoot()
   ],
   controllers: [AppController],
   providers: [AppService],

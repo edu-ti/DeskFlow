@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -11,6 +11,7 @@ import { TicketCreatedEvent } from '../events/ticket-created.event';
 import { SLA_QUEUE_NAME, SlaJobData } from '../../sla/sla-queue.consumer';
 import { BusinessHoursUtil } from '../../sla/business-hours.util';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { SmtpService } from '../../email/services/smtp.service';
 
 @Injectable()
 export class TicketService {
@@ -26,6 +27,8 @@ export class TicketService {
     @InjectQueue(SLA_QUEUE_NAME)
     private readonly slaQueue: Queue,
     private readonly notificationsService: NotificationsService,
+    @Inject(forwardRef(() => SmtpService))
+    private readonly smtpService: SmtpService,
   ) {}
 
   async createTicket(data: Partial<Ticket>, initialArticleBody: string, customFields?: { field_id: number, value: string }[]): Promise<Ticket> {
@@ -73,6 +76,14 @@ export class TicketService {
 
     // TODO: Disparar evento no barramento (ex: EventEmitter2)
     const event = new TicketCreatedEvent(savedTicket.id);
+    
+    // Notify customer via email
+    if (savedTicket.customer_id) {
+       const ticketWithCustomer = await this.ticketRepository.findOne({ where: { id: savedTicket.id }, relations: { customer: true } });
+       if (ticketWithCustomer && ticketWithCustomer.customer) {
+         await this.smtpService.sendTicketCreatedEmail(ticketWithCustomer, ticketWithCustomer.customer);
+       }
+    }
 
     return savedTicket;
   }
@@ -205,6 +216,13 @@ export class TicketService {
         'ticket_updated',
         ticket.id,
       );
+    }
+    
+    if (!is_internal && ticket.customer_id && ticket.customer_id !== actorUserId) {
+       const ticketWithCustomer = await this.ticketRepository.findOne({ where: { id: ticketId }, relations: { customer: true } });
+       if (ticketWithCustomer && ticketWithCustomer.customer) {
+         await this.smtpService.sendTicketReplyEmail(ticketWithCustomer, savedArticle, ticketWithCustomer.customer);
+       }
     }
 
     return savedArticle;

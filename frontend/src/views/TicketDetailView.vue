@@ -113,11 +113,33 @@
     <!-- Right Column: Articles Timeline -->
     <div class="w-2/3 flex flex-col h-full glass-panel rounded-2xl overflow-hidden">
       <!-- Header -->
-      <div class="p-4 border-b border-white/5 bg-white/5 flex items-center">
+      <div class="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
         <h3 class="text-df-text font-medium flex items-center gap-2">
           <MessageSquareIcon class="w-5 h-5 text-df-primary" />
           Conversation
         </h3>
+        
+        <div v-if="isAdminOrAgent && macros.length > 0" class="relative">
+          <button @click="showMacroDropdown = !showMacroDropdown" class="btn-secondary text-xs py-1.5 px-3 flex items-center gap-2">
+            <PlayIcon class="w-3 h-3" />
+            Apply Macro
+            <ChevronDownIcon class="w-3 h-3 ml-1" />
+          </button>
+          
+          <div v-if="showMacroDropdown" class="absolute right-0 mt-2 w-56 bg-df-card border border-white/10 rounded-lg shadow-xl z-10 overflow-hidden">
+            <button 
+              v-for="macro in macros" 
+              :key="macro.id"
+              @click="applyMacro(macro.id)"
+              class="w-full text-left px-4 py-2.5 text-sm text-df-text-muted hover:text-df-text hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 truncate"
+              :title="macro.name"
+            >
+              {{ macro.name }}
+            </button>
+          </div>
+          <!-- Click outside overlay -->
+          <div v-if="showMacroDropdown" @click="showMacroDropdown = false" class="fixed inset-0 z-0"></div>
+        </div>
       </div>
 
       <!-- Timeline Scroll Area -->
@@ -218,9 +240,10 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Loader2 as Loader2Icon, MessageSquare as MessageSquareIcon, Send as SendIcon, User as UserIcon, Lock as LockIcon, Activity as ActivityIcon, X as XIcon } from 'lucide-vue-next'
+import { Loader2 as Loader2Icon, MessageSquare as MessageSquareIcon, Send as SendIcon, User as UserIcon, Lock as LockIcon, Activity as ActivityIcon, X as XIcon, Play as PlayIcon, ChevronDown as ChevronDownIcon } from 'lucide-vue-next'
 import { ticketService } from '../services/ticketService'
 import { iamService } from '../services/iamService'
+import api from '../services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -232,6 +255,8 @@ const timelineRef = ref<HTMLElement | null>(null)
 const isInternalNote = ref(false)
 const isAdminOrAgent = ref(false)
 const agents = ref<any[]>([])
+const macros = ref<any[]>([])
+const showMacroDropdown = ref(false)
 
 const getInitials = (first = '', last = '') => {
   return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U'
@@ -343,6 +368,31 @@ const handleReply = async () => {
   }
 }
 
+const fetchMacros = async () => {
+  try {
+    const res = await api.get('/macros')
+    macros.value = res.data
+  } catch (error) {
+    console.error("Failed to load macros", error)
+  }
+}
+
+const applyMacro = async (macroId: number) => {
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+  showMacroDropdown.value = false
+  
+  try {
+    await api.post(`/tickets/${ticket.value.id}/macros/${macroId}/apply`)
+    await fetchTicket()
+  } catch (error) {
+    console.error("Failed to apply macro", error)
+    alert("Failed to apply macro.")
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
 onMounted(() => {
   const userStr = localStorage.getItem('user')
   if (userStr) {
@@ -351,6 +401,7 @@ onMounted(() => {
       if (user.roles && (user.roles.includes('admin') || user.roles.includes('agent'))) {
         isAdminOrAgent.value = true
         fetchAgents() // Only fetch agents if current user has permissions
+        fetchMacros()
       }
     } catch(e) {}
   }
