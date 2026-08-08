@@ -52,8 +52,8 @@ export class EmailProcessorService {
         if (ticket) {
           await this.ticketService.addArticle(ticketId, emailBody, 'email', false, customerId);
           // Re-open ticket if it was closed
-          if (ticket.state_id === 4) { // Assuming 4 is closed
-            await this.ticketService.changeState(ticketId, 1, customerId); // 1 = open
+          if (ticket.state_id === 5) { // Resolvido
+            await this.ticketService.changeState(ticketId, 2, customerId); // 2 = Aberto
           }
           this.logger.log(`Added email reply to ticket #${ticketId}`);
         }
@@ -72,7 +72,7 @@ export class EmailProcessorService {
       {
         title: subject,
         customer_id: customerId,
-        state_id: 1, // Open
+        state_id: 2, // Aberto
       },
       body
     );

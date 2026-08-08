@@ -9,8 +9,10 @@ export const SLA_QUEUE_NAME = 'sla-queue';
 
 export interface SlaJobData {
   ticketId: number;
-  escalationType: 'firstResponse' | 'update' | 'solution';
+  escalationType: 'firstResponse' | 'update' | 'solution' | 'firstResponseWarning' | 'updateWarning';
 }
+
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Processor(SLA_QUEUE_NAME)
 @Injectable()
@@ -20,6 +22,7 @@ export class SlaQueueConsumer extends WorkerHost {
   constructor(
     @InjectRepository(Ticket)
     private readonly ticketRepository: Repository<Ticket>,
+    private readonly notificationsService: NotificationsService,
   ) {
     super();
   }
@@ -30,14 +33,28 @@ export class SlaQueueConsumer extends WorkerHost {
     const ticket = await this.ticketRepository.findOne({ where: { id: job.data.ticketId } });
     if (!ticket) return;
 
-    // Se o ticket já estiver fechado/resolvido, ignorar (state_id = 4 é fechado na seed, etc. Por enquanto checaremos state_id)
-    // TODO: Usar tabela de estados. 4 = closed
-    if (ticket.state_id === 4) return;
+    // Se o ticket já estiver resolvido(4) ou fechado(5), ignorar o SLA
+    if (ticket.state_id === 5) return;
+
+    const now = new Date();
+
+    if (job.data.escalationType.endsWith('Warning')) {
+      if (job.data.escalationType === 'firstResponseWarning' && ticket.firstResponseEscalationAt) {
+        if (ticket.firstResponseEscalationAt > now && !ticket.isEscalated) {
+          this.logger.warn(`SLA WARNING for Ticket ID: ${job.data.ticketId}`);
+          await this.notificationsService.notifyAdminsAndAgents(
+            'Alerta de SLA',
+            `O chamado #${ticket.id} está prestes a violar o SLA de primeira resposta!`,
+            'sla_warning',
+            ticket.id
+          );
+        }
+      }
+      return;
+    }
 
     // Verificar se o ticket ainda precisa de escalonamento para o tipo específico
-    // Ex: Se o tipo for "firstResponse" e o ticket já teve resposta, a flag firstResponseEscalationAt pode ter sido limpa ou mudada
     let shouldEscalate = false;
-    const now = new Date();
 
     if (job.data.escalationType === 'firstResponse' && ticket.firstResponseEscalationAt && ticket.firstResponseEscalationAt <= now) {
       shouldEscalate = true;

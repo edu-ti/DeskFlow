@@ -3,7 +3,12 @@ import { TicketService } from './ticket.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Ticket } from '../entities/ticket.entity';
 import { Article } from '../entities/article.entity';
+import { TicketHistory } from '../entities/ticket-history.entity';
+import { TicketCustomFieldValue } from '../entities/ticket-custom-field-value.entity';
 import { Repository } from 'typeorm';
+import { getQueueToken } from '@nestjs/bullmq';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { SmtpService } from '../../email/services/smtp.service';
 
 describe('TicketService (PT-002 - Soft Delete)', () => {
   let service: TicketService;
@@ -33,6 +38,26 @@ describe('TicketService (PT-002 - Soft Delete)', () => {
         {
           provide: getRepositoryToken(Article),
           useValue: mockArticleRepository,
+        },
+        {
+          provide: getRepositoryToken(TicketHistory),
+          useValue: {},
+        },
+        {
+          provide: getRepositoryToken(TicketCustomFieldValue),
+          useValue: {},
+        },
+        {
+          provide: getQueueToken('sla-queue'),
+          useValue: {},
+        },
+        {
+          provide: NotificationsService,
+          useValue: {},
+        },
+        {
+          provide: SmtpService,
+          useValue: {},
         },
       ],
     }).compile();

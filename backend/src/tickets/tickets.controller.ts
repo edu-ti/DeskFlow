@@ -13,8 +13,8 @@ export class TicketsController {
   constructor(private readonly ticketService: TicketService) {}
 
   @Get()
-  async getTickets() {
-    return this.ticketService.findAll();
+  async getTickets(@Request() req: any) {
+    return this.ticketService.findAll(req.user);
   }
 
   @Get('stats')
@@ -35,7 +35,7 @@ export class TicketsController {
     // Ler o customer_id logado
     if (!ticketData.customer_id) ticketData.customer_id = req.user.id;
     if (!ticketData.group_id) ticketData.group_id = 1;
-    if (!ticketData.state_id) ticketData.state_id = 1;
+    if (!ticketData.state_id) ticketData.state_id = 2;
     return this.ticketService.createTicket(ticketData, initial_article_body, custom_fields);
   }
 

@@ -13,6 +13,10 @@ export class Ticket {
   @Column()
   title: string;
 
+  // web, email, whatsapp
+  @Column({ default: 'web' })
+  source: string;
+
   @Column({ name: 'group_id' })
   group_id: number;
 
@@ -22,6 +26,9 @@ export class Ticket {
 
   @Column({ name: 'state_id' })
   state_id: number;
+
+  @Column({ name: 'priority_id', default: 2 })
+  priority_id: number;
 
   @Column({ name: 'customer_id' })
   customer_id: number;
@@ -57,6 +64,15 @@ export class Ticket {
 
   @Column({ default: false })
   isEscalated: boolean;
+
+  @Column({ type: 'int', nullable: true })
+  satisfaction_score: number;
+
+  @Column({ type: 'text', nullable: true })
+  satisfaction_comment: string;
+
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  csat_token: string;
 
   @CreateDateColumn()
   created_at: Date;

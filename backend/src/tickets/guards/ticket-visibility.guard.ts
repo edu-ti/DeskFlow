@@ -26,6 +26,10 @@ export class TicketVisibilityGuard implements CanActivate {
       throw new NotFoundException('Ticket not found');
     }
 
+    if (user.roles?.includes('admin') || user.roles?.includes('agent')) {
+      return true;
+    }
+
     // BR-MIGRAR-001: Cliente só pode ver seu próprio ticket
     // Obs: Expansão para "mesma organização" pode ser adicionada aqui posteriormente
     if (ticket.customer_id === user.id) {

@@ -2,10 +2,11 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@n
 import { IamService } from '../services/iam.service';
 import { Group } from '../entities/group.entity';
 import { RolesGuard } from '../guards/roles.guard';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Roles } from '../decorators/roles.decorator';
 
 @Controller('groups')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class GroupsController {
   constructor(private readonly iamService: IamService) {}

@@ -4,6 +4,7 @@ import { ImapFlow } from 'imapflow';
 import { simpleParser, ParsedMail } from 'mailparser';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EmailProcessorService } from './email-processor.service';
+import { SettingsService } from '../../settings/services/settings.service';
 
 @Injectable()
 export class ImapService {
@@ -11,24 +12,31 @@ export class ImapService {
 
   constructor(
     private configService: ConfigService,
+    private settingsService: SettingsService,
     private emailProcessor: EmailProcessorService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES)
   async fetchEmails() {
-    // Basic config check
-    if (!this.configService.get('IMAP_HOST')) {
-      this.logger.warn('IMAP_HOST not configured, skipping IMAP fetch');
+    // Fetch IMAP settings from DB or fallback to .env
+    const imapHost = (await this.settingsService.getSetting('IMAP_HOST')) || this.configService.get('IMAP_HOST');
+    const imapPort = parseInt((await this.settingsService.getSetting('IMAP_PORT')) || this.configService.get('IMAP_PORT') || '993');
+    const imapTls = (await this.settingsService.getSetting('IMAP_TLS')) === 'true' || this.configService.get<boolean>('IMAP_TLS', true);
+    const imapUser = (await this.settingsService.getSetting('IMAP_USER')) || this.configService.get('IMAP_USER');
+    const imapPass = (await this.settingsService.getSetting('IMAP_PASS')) || this.configService.get('IMAP_PASS');
+
+    if (!imapHost || !imapUser || !imapPass) {
+      this.logger.warn('IMAP_HOST, IMAP_USER ou IMAP_PASS not configured in DB or .env, skipping IMAP fetch');
       return;
     }
 
     const client = new ImapFlow({
-      host: this.configService.get<string>('IMAP_HOST') as string,
-      port: this.configService.get<number>('IMAP_PORT', 993),
-      secure: this.configService.get<boolean>('IMAP_TLS', true),
+      host: imapHost,
+      port: imapPort,
+      secure: imapTls,
       auth: {
-        user: this.configService.get<string>('IMAP_USER') as string,
-        pass: this.configService.get<string>('IMAP_PASS') as string,
+        user: imapUser,
+        pass: imapPass,
       },
       logger: false,
     });

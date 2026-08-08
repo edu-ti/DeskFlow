@@ -2,8 +2,8 @@
   <div class="max-w-7xl mx-auto space-y-6">
     <div class="flex justify-between items-center mb-4">
       <div>
-        <h1 class="text-2xl font-bold text-df-text">Dashboard</h1>
-        <p class="text-df-text-muted text-sm mt-1">System overview and ticket metrics</p>
+        <h1 class="text-2xl font-bold text-gray-800">Painel de Controle</h1>
+        <p class="text-gray-500 text-sm mt-1">Visão geral do sistema e métricas de chamados</p>
       </div>
     </div>
 
@@ -14,22 +14,22 @@
 
     <template v-else>
       <!-- Top Row: Status dos Tickets -->
-      <div class="glass-panel p-6 rounded-xl flex items-center gap-12">
+      <div class="bg-white border border-gray-200 shadow-sm p-6 rounded-xl flex items-center gap-12">
         <div class="flex-shrink-0">
-          <h3 class="text-sm font-semibold text-df-text mb-4">Status dos tickets</h3>
+          <h3 class="text-sm font-semibold text-gray-700 mb-4">Status dos chamados</h3>
         </div>
         <div class="flex items-center gap-16 flex-1">
           <div class="flex items-baseline gap-3">
-            <span class="text-3xl font-bold text-df-text">{{ stats?.status?.open || 0 }}</span>
+            <span class="text-3xl font-bold text-gray-800">{{ stats?.status?.open || 0 }}</span>
             <span class="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400">Aberto</span>
           </div>
           <div class="flex items-baseline gap-3">
-            <span class="text-3xl font-bold text-df-text">{{ stats?.status?.pending || 0 }}</span>
-            <span class="px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400">Pendente</span>
+            <span class="text-3xl font-bold text-gray-800">{{ stats?.status?.pending || 0 }}</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">Pendente</span>
           </div>
           <div class="flex items-baseline gap-3">
-            <span class="text-3xl font-bold text-df-text">{{ stats?.status?.overdue || 0 }}</span>
-            <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400">Vencido</span>
+            <span class="text-3xl font-bold text-gray-800">{{ stats?.status?.overdue || 0 }}</span>
+            <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Vencido</span>
           </div>
         </div>
       </div>
@@ -38,36 +38,36 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         <!-- Tickets Críticos e Vencidos (Table) -->
-        <div class="glass-panel rounded-xl flex flex-col h-[400px]">
-          <div class="p-5 border-b border-white/5 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-df-text flex items-center gap-2">
-              Tickets críticos e vencidos
-              <HelpCircleIcon class="w-3.5 h-3.5 text-df-text-muted" />
+        <div class="bg-white border border-gray-200 shadow-sm rounded-xl flex flex-col h-[400px]">
+          <div class="p-5 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              Chamados críticos e vencidos
+              <HelpCircleIcon class="w-3.5 h-3.5 text-gray-400" />
             </h3>
           </div>
           <div class="flex-1 overflow-auto custom-scrollbar p-0">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="bg-white/5 text-xs text-df-text-muted uppercase tracking-wider sticky top-0">
+                <tr class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider sticky top-0">
                   <th class="py-3 px-5 font-semibold">Detalhes</th>
                   <th class="py-3 px-5 font-semibold w-24">SLA</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="stats?.criticalTickets?.length === 0">
-                  <td colspan="2" class="py-8 text-center text-sm text-df-text-muted">Nenhum ticket vencido 🎉</td>
+                  <td colspan="2" class="py-8 text-center text-sm text-gray-400">Nenhum chamado vencido 🎉</td>
                 </tr>
                 <tr 
                   v-for="ticket in stats?.criticalTickets" 
                   :key="ticket.id"
                   @click="router.push(`/tickets/${ticket.id}`)"
-                  class="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                  class="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
                 >
                   <td class="py-3 px-5">
-                    <div class="text-sm font-medium text-df-text">#{{ ticket.id }} - {{ ticket.title }}</div>
+                    <div class="text-sm font-medium text-gray-800">#{{ ticket.id }} - {{ ticket.title }}</div>
                   </td>
                   <td class="py-3 px-5">
-                    <span class="text-xs font-medium text-red-400 bg-red-500/10 px-2 py-1 rounded">Estourado</span>
+                    <span class="text-xs font-medium text-red-700 bg-red-100 px-2 py-1 rounded">Estourado</span>
                   </td>
                 </tr>
               </tbody>
@@ -76,10 +76,10 @@
         </div>
 
         <!-- Atividade de tickets (Chart) -->
-        <div class="glass-panel rounded-xl p-5 flex flex-col h-[400px]">
+        <div class="bg-white border border-gray-200 shadow-sm rounded-xl p-5 flex flex-col h-[400px]">
           <div class="flex items-center justify-between mb-6">
-            <h3 class="text-sm font-semibold text-df-text flex items-center gap-2">
-              Atividade de tickets
+            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              Atividade de chamados
             </h3>
             <div class="flex items-center gap-4 text-xs font-medium">
               <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded bg-df-primary"></span> Aberto</div>
@@ -92,20 +92,20 @@
         </div>
 
         <!-- Estatísticas médias de SLA -->
-        <div class="glass-panel rounded-xl p-5 lg:col-span-2 flex items-center justify-around py-8">
+        <div class="bg-white border border-gray-200 shadow-sm rounded-xl p-5 lg:col-span-2 flex items-center justify-around py-8">
           <div class="text-center">
-            <h4 class="text-3xl font-bold text-df-text mb-2">{{ stats?.avgStats?.firstResponse || '0m' }}</h4>
-            <p class="text-xs text-df-text-muted">Tempo médio de primeira resposta</p>
+            <h4 class="text-3xl font-bold text-gray-800 mb-2">{{ stats?.avgStats?.firstResponse || '0m' }}</h4>
+            <p class="text-xs text-gray-500">Tempo médio de primeira resposta</p>
           </div>
-          <div class="w-px h-16 bg-white/10"></div>
+          <div class="w-px h-16 bg-gray-200"></div>
           <div class="text-center">
-            <h4 class="text-3xl font-bold text-df-text mb-2">{{ stats?.avgStats?.closeTime || '0m' }}</h4>
-            <p class="text-xs text-df-text-muted">Tempo médio de fechamento</p>
+            <h4 class="text-3xl font-bold text-gray-800 mb-2">{{ stats?.avgStats?.closeTime || '0m' }}</h4>
+            <p class="text-xs text-gray-500">Tempo médio de fechamento</p>
           </div>
-          <div class="w-px h-16 bg-white/10"></div>
+          <div class="w-px h-16 bg-gray-200"></div>
           <div class="text-center">
-            <h4 class="text-3xl font-bold text-df-text mb-2">{{ stats?.avgStats?.timeEntry || '0m' }}</h4>
-            <p class="text-xs text-df-text-muted">Duração média de entrada de tempo</p>
+            <h4 class="text-3xl font-bold text-gray-800 mb-2">{{ stats?.avgStats?.timeEntry || '0m' }}</h4>
+            <p class="text-xs text-gray-500">Duração média de entrada de tempo</p>
           </div>
         </div>
       </div>
@@ -146,14 +146,14 @@ const chartData = computed(() => {
     datasets: [
       {
         label: 'Aberto',
-        backgroundColor: '#4ade80', // df-primary (green)
+        backgroundColor: '#0050d2', // df-primary (blue)
         data: stats.value.activity.map((a: any) => a.open),
         barPercentage: 0.5,
         categoryPercentage: 0.8
       },
       {
         label: 'Resolvido',
-        backgroundColor: '#10b981', // df-accent
+        backgroundColor: '#00c0db', // df-accent (cyan)
         data: stats.value.activity.map((a: any) => a.resolved),
         barPercentage: 0.5,
         categoryPercentage: 0.8
@@ -172,10 +172,10 @@ const chartOptions = {
     tooltip: {
       mode: 'index',
       intersect: false,
-      backgroundColor: 'rgba(15, 23, 42, 0.9)',
-      titleColor: '#fff',
-      bodyColor: '#cbd5e1',
-      borderColor: 'rgba(255,255,255,0.1)',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      titleColor: '#1f2937',
+      bodyColor: '#4b5563',
+      borderColor: '#e5e7eb',
       borderWidth: 1
     }
   },
@@ -186,16 +186,16 @@ const chartOptions = {
         drawBorder: false
       },
       ticks: {
-        color: '#94a3b8'
+        color: '#6b7280'
       }
     },
     y: {
       grid: {
-        color: 'rgba(255, 255, 255, 0.05)',
+        color: '#f3f4f6',
         drawBorder: false
       },
       ticks: {
-        color: '#94a3b8',
+        color: '#6b7280',
         stepSize: 1
       },
       beginAtZero: true
@@ -216,10 +216,10 @@ onMounted(() => {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
 }
 </style>

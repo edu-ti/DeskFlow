@@ -1,14 +1,14 @@
 <template>
-  <div class="max-w-6xl mx-auto h-[calc(100vh-4rem)] flex gap-6">
+  <div class="max-w-6xl mx-auto lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-6 pb-6 lg:pb-0">
     <!-- Left Column: Ticket Info -->
-    <div class="w-1/3 flex flex-col gap-6 h-full overflow-y-auto pr-2 custom-scrollbar">
-      <div v-if="isLoading" class="glass-panel p-6 rounded-2xl flex justify-center">
+    <div class="w-full lg:w-1/3 flex flex-col gap-6 lg:h-full lg:overflow-y-auto lg:pr-2 custom-scrollbar shrink-0">
+      <div v-if="isLoading" class="bg-white border border-gray-200 shadow-sm p-6 rounded-2xl flex justify-center">
         <Loader2Icon class="w-6 h-6 text-df-primary animate-spin" />
       </div>
       
-      <div v-else-if="ticket" class="glass-panel p-6 rounded-2xl">
+      <div v-else-if="ticket" class="bg-white border border-gray-200 shadow-sm p-6 rounded-2xl">
         <div class="flex items-center gap-3 mb-4">
-          <h1 class="text-xl font-bold text-df-text flex-1">#{{ ticket.id }}</h1>
+          <h1 class="text-xl font-bold text-gray-800 flex-1">#{{ ticket.id }}</h1>
           
           <select 
             v-if="isAdminOrAgent" 
@@ -16,41 +16,41 @@
             @change="updateState"
             class="px-2.5 py-1 bg-df-accent/20 text-df-accent border border-df-accent/30 rounded-full text-xs font-medium focus:outline-none focus:ring-1 focus:ring-df-accent appearance-none cursor-pointer"
           >
-            <option :value="1">New</option>
-            <option :value="2">Open</option>
-            <option :value="3">Pending</option>
-            <option :value="4">Resolved</option>
-            <option :value="5">Closed</option>
+            <option :value="1">Novo</option>
+            <option :value="2">Aberto</option>
+            <option :value="3">Pendente</option>
+            <option :value="4">Resolvido</option>
+            <option :value="5">Fechado</option>
           </select>
           <span v-else class="px-2.5 py-1 bg-df-accent/20 text-df-accent rounded-full text-xs font-medium">
             {{ getStatusName(ticket.state_id) }}
           </span>
         </div>
         
-        <h2 class="text-lg text-df-text font-medium mb-6">{{ ticket.title }}</h2>
+        <h2 class="text-lg text-gray-800 font-medium mb-6">{{ ticket.title }}</h2>
 
         <div class="space-y-4">
           <div>
-            <label class="text-xs text-df-text-muted font-medium uppercase tracking-wider block mb-1">Customer</label>
+            <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">Cliente</label>
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 rounded-full bg-df-primary/20 flex items-center justify-center text-df-primary font-bold text-sm">
                 {{ getInitials(ticket.customer?.firstname, ticket.customer?.lastname) }}
               </div>
               <div>
-                <p class="text-sm text-df-text font-medium">{{ ticket.customer?.firstname }} {{ ticket.customer?.lastname }}</p>
-                <p class="text-xs text-df-text-muted">{{ ticket.customer?.email }}</p>
+                <p class="text-sm text-gray-800 font-medium">{{ ticket.customer?.firstname }} {{ ticket.customer?.lastname }}</p>
+                <p class="text-xs text-gray-500">{{ ticket.customer?.email }}</p>
               </div>
             </div>
           </div>
           <div>
-            <label class="text-xs text-df-text-muted font-medium uppercase tracking-wider block mb-1">Assignee</label>
+            <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">Responsável</label>
             <select 
               v-if="isAdminOrAgent"
               v-model="ticket.owner_id"
               @change="updateAssignee"
-              class="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-df-text focus:outline-none focus:border-df-primary focus:ring-1 focus:ring-df-primary"
+              class="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-800 focus:outline-none focus:border-df-primary focus:ring-1 focus:ring-df-primary"
             >
-              <option :value="null">Unassigned</option>
+              <option :value="null">Não Atribuído</option>
               <option v-for="agent in agents" :key="agent.id" :value="agent.id">
                 {{ agent.firstname }} {{ agent.lastname }}
               </option>
@@ -60,50 +60,55 @@
                 <div class="w-6 h-6 rounded-full bg-df-primary/20 flex items-center justify-center text-df-primary font-bold text-xs">
                   {{ getInitials(ticket.owner?.firstname, ticket.owner?.lastname) }}
                 </div>
-                <p class="text-sm text-df-text font-medium">{{ ticket.owner?.firstname }} {{ ticket.owner?.lastname }}</p>
+                <p class="text-sm text-gray-800 font-medium">{{ ticket.owner?.firstname }} {{ ticket.owner?.lastname }}</p>
               </div>
-              <p v-else class="text-sm text-df-text-muted">Unassigned</p>
+              <p v-else class="text-sm text-gray-500">Não Atribuído</p>
             </div>
           </div>
 
           <div>
-            <label class="text-xs text-df-text-muted font-medium uppercase tracking-wider block mb-1">Created At</label>
-            <p class="text-sm text-df-text">{{ new Date(ticket.created_at).toLocaleString() }}</p>
+            <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">Criado em</label>
+            <p class="text-sm text-gray-800">{{ new Date(ticket.created_at).toLocaleString() }}</p>
           </div>
 
           <div v-if="ticket.custom_field_values && ticket.custom_field_values.length > 0">
-            <div class="h-px bg-white/10 my-4"></div>
-            <h3 class="text-xs text-df-text-muted font-medium uppercase tracking-wider mb-3">Additional Details</h3>
+            <div class="h-px bg-gray-200 my-4"></div>
+            <h3 class="text-xs text-gray-500 font-medium uppercase tracking-wider mb-3">Detalhes Adicionais</h3>
             <div class="space-y-3">
               <div v-for="cfValue in ticket.custom_field_values" :key="cfValue.id">
-                <label class="text-xs text-df-text-muted font-medium uppercase tracking-wider block mb-1">
+                <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">
                   {{ cfValue.custom_field?.name }}
                 </label>
-                <p class="text-sm text-df-text">{{ cfValue.value }}</p>
+                <p class="text-sm text-gray-800">{{ cfValue.value }}</p>
               </div>
             </div>
           </div>
 
-          <div v-if="ticket.firstResponseEscalationAt">
-            <label class="text-xs text-df-text-muted font-medium uppercase tracking-wider block mb-1">
-              <span v-if="ticket.isEscalated" class="text-red-400">SLA Violated</span>
-              <span v-else>SLA Target (Response)</span>
+          <div v-if="ticket.firstResponseEscalationAt" class="pt-2">
+            <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">
+              Acordo de Nível de Serviço (SLA)
             </label>
-            <p class="text-sm" :class="ticket.isEscalated ? 'text-red-400 font-bold' : 'text-df-text'">
-              {{ new Date(ticket.firstResponseEscalationAt).toLocaleString() }}
-            </p>
+            <div class="flex items-center gap-2 mt-1">
+              <span v-if="ticket.isEscalated" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                <AlertCircleIcon class="w-4 h-4" /> Violado em {{ new Date(ticket.firstResponseEscalationAt).toLocaleString() }}
+              </span>
+              <span v-else class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border" :class="isNearBreach(ticket.firstResponseEscalationAt) ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-gray-50 text-gray-700 border-gray-200'">
+                <ClockIcon class="w-4 h-4" /> Vence em: {{ formatTimeRemaining(ticket.firstResponseEscalationAt) }}
+              </span>
+            </div>
+            <p v-if="!ticket.isEscalated" class="text-xs text-gray-400 mt-1.5">Alvo: {{ new Date(ticket.firstResponseEscalationAt).toLocaleString() }}</p>
           </div>
         </div>
       </div>
       
-      <div v-else class="glass-panel p-6 rounded-2xl flex flex-col items-center justify-center text-center">
-        <div class="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mb-4">
+      <div v-else class="bg-white border border-gray-200 shadow-sm p-6 rounded-2xl flex flex-col items-center justify-center text-center">
+        <div class="w-12 h-12 rounded-full bg-red-100 text-red-500 flex items-center justify-center mb-4">
           <XIcon class="w-6 h-6" />
         </div>
-        <h3 class="text-lg font-medium text-df-text">Ticket Not Found</h3>
-        <p class="text-sm text-df-text-muted mt-2">This ticket may have been deleted or does not exist.</p>
+        <h3 class="text-lg font-medium text-gray-800">Chamado Não Encontrado</h3>
+        <p class="text-sm text-gray-500 mt-2">Este chamado pode ter sido excluído ou não existe.</p>
         <button @click="router.push('/tickets')" class="mt-6 text-df-primary hover:text-df-primary-hover text-sm font-medium">
-          &larr; Back to Tickets
+          &larr; Voltar para Chamados
         </button>
       </div>
 
@@ -111,27 +116,27 @@
     </div>
 
     <!-- Right Column: Articles Timeline -->
-    <div class="w-2/3 flex flex-col h-full glass-panel rounded-2xl overflow-hidden">
+    <div class="w-full lg:w-2/3 flex flex-col flex-1 h-[600px] lg:h-full bg-white border border-gray-200 shadow-sm rounded-2xl overflow-hidden">
       <!-- Header -->
-      <div class="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
-        <h3 class="text-df-text font-medium flex items-center gap-2">
+      <div class="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+        <h3 class="text-gray-800 font-medium flex items-center gap-2">
           <MessageSquareIcon class="w-5 h-5 text-df-primary" />
-          Conversation
+          Conversa
         </h3>
         
         <div v-if="isAdminOrAgent && macros.length > 0" class="relative">
-          <button @click="showMacroDropdown = !showMacroDropdown" class="btn-secondary text-xs py-1.5 px-3 flex items-center gap-2">
+          <button @click="showMacroDropdown = !showMacroDropdown" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs py-1.5 px-3 rounded-md flex items-center gap-2 transition-colors">
             <PlayIcon class="w-3 h-3" />
-            Apply Macro
+            Aplicar Macro
             <ChevronDownIcon class="w-3 h-3 ml-1" />
           </button>
           
-          <div v-if="showMacroDropdown" class="absolute right-0 mt-2 w-56 bg-df-card border border-white/10 rounded-lg shadow-xl z-10 overflow-hidden">
+          <div v-if="showMacroDropdown" class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-10 overflow-hidden">
             <button 
               v-for="macro in macros" 
               :key="macro.id"
               @click="applyMacro(macro.id)"
-              class="w-full text-left px-4 py-2.5 text-sm text-df-text-muted hover:text-df-text hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 truncate"
+              class="w-full text-left px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 truncate"
               :title="macro.name"
             >
               {{ macro.name }}
@@ -154,42 +159,42 @@
             <!-- History Event -->
             <template v-if="item.type === 'history'">
               <div class="w-10 flex flex-col items-center">
-                <div class="w-8 h-8 rounded-full bg-white/5 flex-shrink-0 flex items-center justify-center text-white/50 text-xs">
+                <div class="w-8 h-8 rounded-full bg-gray-100 flex-shrink-0 flex items-center justify-center text-gray-400 text-xs">
                   <ActivityIcon class="w-4 h-4" />
                 </div>
               </div>
               <div class="flex-1 pt-1.5">
-                <p class="text-sm text-df-text-muted">
-                  <span class="font-medium text-df-text">{{ item.user?.firstname || 'System' }}</span>
-                  changed <span class="font-medium">{{ formatField(item.field) }}</span> 
-                  from <span class="line-through opacity-70">{{ formatValue(item.field, item.old_value) }}</span> 
-                  to <span class="font-medium text-white">{{ formatValue(item.field, item.new_value) }}</span>
+                <p class="text-sm text-gray-500">
+                  <span class="font-medium text-gray-800">{{ item.user?.firstname || 'Sistema' }}</span>
+                  alterou <span class="font-medium">{{ formatField(item.field) }}</span> 
+                  de <span class="line-through opacity-70">{{ formatValue(item.field, item.old_value) }}</span> 
+                  para <span class="font-medium text-gray-800">{{ formatValue(item.field, item.new_value) }}</span>
                 </p>
-                <span class="text-xs text-df-text-muted/50">{{ new Date(item.created_at).toLocaleString() }}</span>
+                <span class="text-xs text-gray-400">{{ new Date(item.created_at).toLocaleString() }}</span>
               </div>
             </template>
 
             <!-- Article Event -->
             <template v-if="item.type === 'article'">
               <!-- Avatar -->
-              <div class="w-10 h-10 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center text-white text-sm font-medium">
-                <UserIcon class="w-5 h-5 text-df-text-muted" />
+              <div class="w-10 h-10 rounded-full bg-gray-100 flex-shrink-0 flex items-center justify-center text-gray-500 text-sm font-medium">
+                <UserIcon class="w-5 h-5 text-gray-400" />
               </div>
               
               <!-- Message Bubble -->
               <div class="flex-1">
                 <div class="flex items-baseline gap-2 mb-1">
-                  <span class="text-sm font-medium text-df-text">
+                  <span class="text-sm font-medium text-gray-800">
                     {{ item.authorName }}
                   </span>
-                  <span class="text-xs text-df-text-muted">{{ new Date(item.created_at).toLocaleString() }}</span>
-                  <span v-if="item.is_internal" class="ml-2 text-[10px] font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded flex items-center gap-1 uppercase tracking-wider">
-                    <LockIcon class="w-3 h-3" /> Internal Note
+                  <span class="text-xs text-gray-500">{{ new Date(item.created_at).toLocaleString() }}</span>
+                  <span v-if="item.is_internal" class="ml-2 text-[10px] font-bold text-orange-600 bg-orange-100 border border-orange-200 px-2 py-0.5 rounded flex items-center gap-1 uppercase tracking-wider">
+                    <LockIcon class="w-3 h-3" /> Nota Interna
                   </span>
                 </div>
                 <div :class="[
                   'border rounded-2xl rounded-tl-none p-4 text-sm whitespace-pre-wrap',
-                  item.is_internal ? 'bg-orange-500/5 border-orange-500/20 text-orange-100/90' : 'bg-white/5 border-white/10 text-df-text-muted'
+                  item.is_internal ? 'bg-orange-50 border-orange-200 text-orange-800' : 'bg-gray-50 border-gray-200 text-gray-700'
                 ]">
                   {{ item.body }}
                 </div>
@@ -199,29 +204,29 @@
           </div>
         </template>
         
-        <div v-else class="flex flex-col items-center justify-center h-full text-center text-df-text-muted">
-          <MessageSquareIcon class="w-12 h-12 mb-4 opacity-20" />
-          <p>Conversation unavailable.</p>
+        <div v-else class="flex flex-col items-center justify-center h-full text-center text-gray-400">
+          <MessageSquareIcon class="w-12 h-12 mb-4 opacity-30" />
+          <p>Conversa indisponível.</p>
         </div>
       </div>
 
       <!-- Reply Box -->
-      <div class="p-4 border-t border-white/5 bg-df-bg/50">
+      <div class="p-4 border-t border-gray-200 bg-gray-50">
         <form @submit.prevent="handleReply" class="relative">
           <textarea 
             v-model="replyText"
             rows="3"
-            placeholder="Type your reply here..."
-            class="w-full bg-df-bg/80 border border-white/10 rounded-xl py-3 px-4 pr-12 text-df-text placeholder-df-text-muted/30 focus:outline-none focus:border-df-primary focus:ring-1 focus:ring-df-primary transition-colors resize-none"
+            placeholder="Digite sua resposta aqui..."
+            class="w-full bg-white border border-gray-300 rounded-xl py-3 px-4 pr-12 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-df-primary focus:ring-1 focus:ring-df-primary transition-colors resize-none"
             @keydown.enter.ctrl.exact="handleReply"
           ></textarea>
           
           <div class="absolute bottom-3 right-3 flex items-center gap-3">
-            <label v-if="isAdminOrAgent" class="flex items-center gap-1.5 cursor-pointer text-xs text-df-text-muted hover:text-df-text transition-colors mr-2">
-              <input type="checkbox" v-model="isInternalNote" class="rounded border-white/20 bg-white/5 text-df-primary focus:ring-df-primary focus:ring-offset-0" />
-              <span>Internal Note</span>
+            <label v-if="isAdminOrAgent" class="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500 hover:text-gray-800 transition-colors mr-2">
+              <input type="checkbox" v-model="isInternalNote" class="rounded border-gray-300 bg-white text-df-primary focus:ring-df-primary focus:ring-offset-0" />
+              <span>Nota Interna</span>
             </label>
-            <span class="text-xs text-df-text-muted hidden sm:inline-block">Ctrl + Enter</span>
+            <span class="text-xs text-gray-400 hidden sm:inline-block">Ctrl + Enter</span>
             <button 
               type="submit" 
               :disabled="!replyText.trim() || isSubmitting"
@@ -240,7 +245,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Loader2 as Loader2Icon, MessageSquare as MessageSquareIcon, Send as SendIcon, User as UserIcon, Lock as LockIcon, Activity as ActivityIcon, X as XIcon, Play as PlayIcon, ChevronDown as ChevronDownIcon } from 'lucide-vue-next'
+import { Loader2 as Loader2Icon, MessageSquare as MessageSquareIcon, Send as SendIcon, User as UserIcon, Lock as LockIcon, Activity as ActivityIcon, X as XIcon, Play as PlayIcon, ChevronDown as ChevronDownIcon, Clock as ClockIcon, AlertCircle as AlertCircleIcon } from 'lucide-vue-next'
 import { ticketService } from '../services/ticketService'
 import { iamService } from '../services/iamService'
 import api from '../services/api'
@@ -263,22 +268,22 @@ const getInitials = (first = '', last = '') => {
 }
 
 const getStatusName = (stateId: number) => {
-  const map: Record<number, string> = { 1: 'New', 2: 'Open', 3: 'Pending', 4: 'Resolved', 5: 'Closed' }
-  return map[stateId] || 'Unknown'
+  const map: Record<number, string> = { 1: 'Novo', 2: 'Aberto', 3: 'Pendente', 4: 'Resolvido', 5: 'Fechado' }
+  return map[stateId] || 'Desconhecido'
 }
 
 const formatField = (field: string) => {
   if (field === 'state_id') return 'Status';
-  if (field === 'owner_id') return 'Assignee';
+  if (field === 'owner_id') return 'Responsável';
   return field;
 }
 
 const formatValue = (field: string, val: string) => {
-  if (val === null || val === undefined || val === 'undefined') return 'Unassigned';
+  if (val === null || val === undefined || val === 'undefined') return 'Não Atribuído';
   if (field === 'state_id') return getStatusName(parseInt(val));
   if (field === 'owner_id') {
     const agent = agents.value.find(a => a.id === parseInt(val));
-    return agent ? `${agent.firstname} ${agent.lastname}` : `User #${val}`;
+    return agent ? `${agent.firstname} ${agent.lastname}` : `Usuário #${val}`;
   }
   return val;
 }
@@ -290,7 +295,7 @@ const timelineItems = computed(() => {
   
   if (ticket.value.articles) {
     ticket.value.articles.forEach((a: any) => {
-      items.push({ ...a, type: 'article', authorName: ticket.value.customer?.firstname || 'Customer' });
+      items.push({ ...a, type: 'article', authorName: ticket.value.customer?.firstname || 'Cliente' });
     });
   }
 
@@ -303,6 +308,38 @@ const timelineItems = computed(() => {
   // Sort by created_at ascending
   return items.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 })
+
+const isNearBreach = (dateString: string) => {
+  if (!dateString) return false
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffHours = (date.getTime() - now.getTime()) / (1000 * 60 * 60)
+  return diffHours > 0 && diffHours <= 1 // Less than 1 hour remaining
+}
+
+const formatTimeRemaining = (dateString: string) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = date.getTime() - now.getTime()
+  
+  if (diffMs <= 0) return 'Vencido'
+  
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  if (diffMins < 60) {
+    return `${diffMins}m`
+  }
+  
+  const diffHours = Math.floor(diffMins / 60)
+  const remainingMins = diffMins % 60
+  
+  if (diffHours < 24) {
+    return `${diffHours}h ${remainingMins > 0 ? remainingMins + 'm' : ''}`
+  }
+  
+  const diffDays = Math.floor(diffHours / 24)
+  return `${diffDays}d ${diffHours % 24}h`
+}
 
 const scrollToBottom = () => {
   if (timelineRef.value) {
@@ -362,7 +399,7 @@ const handleReply = async () => {
     await fetchTicket()
   } catch (error) {
     console.error("Failed to post reply", error)
-    alert("Failed to send reply.")
+    alert("Falha ao enviar resposta.")
   } finally {
     isSubmitting.value = false
   }
@@ -387,7 +424,7 @@ const applyMacro = async (macroId: number) => {
     await fetchTicket()
   } catch (error) {
     console.error("Failed to apply macro", error)
-    alert("Failed to apply macro.")
+    alert("Falha ao aplicar macro.")
   } finally {
     isSubmitting.value = false
   }
@@ -418,10 +455,10 @@ onMounted(() => {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
 }
 </style>

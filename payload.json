@@ -1,0 +1,31 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "changes": [
+        {
+          "value": {
+            "metadata": {
+              "phone_number_id": "1234567890"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Cliente de Teste"
+                }
+              }
+            ],
+            "messages": [
+              {
+                "from": "5511999999999",
+                "text": {
+                  "body": "Olá! Gostaria de uma ajuda, por favor."
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

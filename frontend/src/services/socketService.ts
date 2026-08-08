@@ -40,6 +40,10 @@ class SocketService {
       this.socket = null;
     }
   }
+
+  getSocket(): Socket | null {
+    return this.socket;
+  }
 }
 
 export const socketService = new SocketService();

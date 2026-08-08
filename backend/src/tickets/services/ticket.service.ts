@@ -12,6 +12,9 @@ import { SLA_QUEUE_NAME, SlaJobData } from '../../sla/sla-queue.consumer';
 import { BusinessHoursUtil } from '../../sla/business-hours.util';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { SmtpService } from '../../email/services/smtp.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { SlaPoliciesService } from '../../sla/services/sla-policies.service';
+import { WhatsappService } from '../../whatsapp/whatsapp.service';
 
 @Injectable()
 export class TicketService {
@@ -29,18 +32,36 @@ export class TicketService {
     private readonly notificationsService: NotificationsService,
     @Inject(forwardRef(() => SmtpService))
     private readonly smtpService: SmtpService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly slaPoliciesService: SlaPoliciesService,
+    @Inject(forwardRef(() => WhatsappService))
+    private readonly whatsappService: WhatsappService,
   ) {}
 
   async createTicket(data: Partial<Ticket>, initialArticleBody: string, customFields?: { field_id: number, value: string }[]): Promise<Ticket> {
-    const now = new Date();
+    const newTicket = this.ticketRepository.create(data);
     
-    // MVP: SLA fixo de 4 horas para primeira resposta
-    const firstResponseAt = BusinessHoursUtil.addBusinessHours(now, 4);
-    
-    data.firstResponseEscalationAt = firstResponseAt;
+    // Busca política de SLA aplicável
+    const slaPolicy = await this.slaPoliciesService.getMatchingPolicy(
+      newTicket.priority_id,
+      newTicket.group_id
+    );
 
-    const ticket = this.ticketRepository.create(data);
-    const savedTicket = await this.ticketRepository.save(ticket);
+    if (slaPolicy) {
+      newTicket.firstResponseEscalationAt = BusinessHoursUtil.addMinutes(new Date(), slaPolicy.first_response_mins);
+      newTicket.solutionEscalationAt = BusinessHoursUtil.addMinutes(new Date(), slaPolicy.resolution_mins);
+    } else {
+      // Fallback antigo caso não haja política
+      let slaHours = 8;
+      if (data.priority_id === 1) slaHours = 24;
+      else if (data.priority_id === 2) slaHours = 8;
+      else if (data.priority_id === 3) slaHours = 4;
+      else if (data.priority_id === 4) slaHours = 2;
+      
+      newTicket.firstResponseEscalationAt = BusinessHoursUtil.addBusinessHours(new Date(), slaHours);
+    }
+
+    const savedTicket = await this.ticketRepository.save(newTicket);
 
     const article = this.articleRepository.create({
       ticket_id: savedTicket.id,
@@ -58,13 +79,37 @@ export class TicketService {
       await this.customFieldValueRepository.save(fieldValues);
     }
 
-    // Adiciona o job de validação de SLA
-    const delay = firstResponseAt.getTime() - now.getTime();
-    await this.slaQueue.add(
-      'check-first-response',
-      { ticketId: savedTicket.id, escalationType: 'firstResponse' } as SlaJobData,
-      { delay }
-    );
+    // Agenda os Jobs do SLA de 1ª Resposta no BullMQ
+    if (savedTicket.firstResponseEscalationAt) {
+      const delayFull = savedTicket.firstResponseEscalationAt.getTime() - new Date().getTime();
+      const delayWarning = delayFull - (30 * 60 * 1000); // 30 minutos antes
+      
+      if (delayWarning > 0) {
+        await this.slaQueue.add('check-first-response-warning', {
+          ticketId: savedTicket.id,
+          escalationType: 'firstResponseWarning',
+        } as SlaJobData, { delay: delayWarning, removeOnComplete: true });
+      }
+      
+      if (delayFull > 0) {
+        await this.slaQueue.add('check-first-response', {
+          ticketId: savedTicket.id,
+          escalationType: 'firstResponse',
+        } as SlaJobData, { delay: delayFull, removeOnComplete: true });
+      }
+    }
+
+    // Agenda os Jobs de Solução no BullMQ
+    if (savedTicket.solutionEscalationAt) {
+      const delayFullSolution = savedTicket.solutionEscalationAt.getTime() - new Date().getTime();
+      
+      if (delayFullSolution > 0) {
+        await this.slaQueue.add('check-solution', {
+          ticketId: savedTicket.id,
+          escalationType: 'solution',
+        } as SlaJobData, { delay: delayFullSolution, removeOnComplete: true });
+      }
+    }
 
     // Disparar evento de notificacao para Admins/Agents
     await this.notificationsService.notifyAdminsAndAgents(
@@ -74,8 +119,10 @@ export class TicketService {
       savedTicket.id,
     );
 
-    // TODO: Disparar evento no barramento (ex: EventEmitter2)
-    const event = new TicketCreatedEvent(savedTicket.id);
+    // Disparar evento no barramento
+    this.eventEmitter.emit('ticket.created', {
+      ticket: savedTicket,
+    });
     
     // Notify customer via email
     if (savedTicket.customer_id) {
@@ -88,8 +135,12 @@ export class TicketService {
     return savedTicket;
   }
 
-  async findAll(): Promise<Ticket[]> {
-    return this.ticketRepository.find({ 
+  async findAll(user?: any): Promise<Ticket[]> {
+    const isCustomerOnly = user?.roles?.length === 1 && user.roles.includes('customer');
+    const whereClause = isCustomerOnly ? { customer_id: user.id } : {};
+
+    return this.ticketRepository.find({
+      where: whereClause,
       order: { 
         isEscalated: 'DESC',
         created_at: 'DESC' 
@@ -99,9 +150,9 @@ export class TicketService {
 
   async getDashboardStats() {
     const totalTickets = await this.ticketRepository.count();
-    const openTickets = await this.ticketRepository.count({ where: { state_id: 1 } });
-    const closedTickets = await this.ticketRepository.count({ where: { state_id: 4 } });
-    const pendingTickets = totalTickets - openTickets - closedTickets;
+    const openTickets = await this.ticketRepository.count({ where: { state_id: 2 } });
+    const closedTickets = await this.ticketRepository.count({ where: { state_id: 5 } });
+    const pendingTickets = await this.ticketRepository.count({ where: { state_id: 4 } });
     const escalatedTickets = await this.ticketRepository.count({ where: { isEscalated: true } });
     
     // Recent 7 days activity
@@ -110,8 +161,8 @@ export class TicketService {
     
     const activityRaw = await this.ticketRepository.createQueryBuilder('ticket')
       .select("DATE(ticket.created_at)", "date")
-      .addSelect("SUM(CASE WHEN ticket.state_id != 4 THEN 1 ELSE 0 END)", "open")
-      .addSelect("SUM(CASE WHEN ticket.state_id = 4 THEN 1 ELSE 0 END)", "resolved")
+      .addSelect("SUM(CASE WHEN ticket.state_id != 5 THEN 1 ELSE 0 END)", "open")
+      .addSelect("SUM(CASE WHEN ticket.state_id = 5 THEN 1 ELSE 0 END)", "resolved")
       .where("ticket.created_at >= :date", { date: last7Days })
       .groupBy("DATE(ticket.created_at)")
       .orderBy("DATE(ticket.created_at)", "ASC")
@@ -221,7 +272,11 @@ export class TicketService {
     if (!is_internal && ticket.customer_id && ticket.customer_id !== actorUserId) {
        const ticketWithCustomer = await this.ticketRepository.findOne({ where: { id: ticketId }, relations: { customer: true } });
        if (ticketWithCustomer && ticketWithCustomer.customer) {
-         await this.smtpService.sendTicketReplyEmail(ticketWithCustomer, savedArticle, ticketWithCustomer.customer);
+         if (ticketWithCustomer.source === 'whatsapp' && ticketWithCustomer.customer.phone) {
+           await this.whatsappService.sendMessage(ticketWithCustomer.customer.phone, body);
+         } else {
+           await this.smtpService.sendTicketReplyEmail(ticketWithCustomer, savedArticle, ticketWithCustomer.customer);
+         }
        }
     }
 
@@ -237,10 +292,33 @@ export class TicketService {
     const oldState = ticket.state_id;
     if (oldState !== newStateId) {
       ticket.state_id = newStateId;
+
+      // Se mudou para Resolvido (5) e ainda não tem token de CSAT, gera um
+      if (newStateId === 5 && !ticket.csat_token) {
+        ticket.csat_token = require('crypto').randomUUID();
+        
+        if (ticket.source === 'email' || ticket.source === 'web') {
+          // Enviar por E-mail
+          if (ticket.customer_id) {
+            const tFull = await this.ticketRepository.findOne({ where: { id: ticket.id }, relations: { customer: true } });
+            if (tFull && tFull.customer) {
+              await this.smtpService.sendCsatEmail(tFull, tFull.customer);
+            }
+          }
+        } else if (ticket.source === 'whatsapp') {
+          // TODO: Enviar pesquisa CSAT via WhatsApp (será implementado no módulo Omnichannel)
+        }
+      }
+
       await this.ticketRepository.save(ticket);
       await this.addHistory(ticketId, actorUserId, 'state_id', oldState?.toString(), newStateId.toString());
       
       // TODO: Recalcular SLA (BR-MIGRAR-002)
+      
+      this.eventEmitter.emit('ticket.updated', {
+        ticket,
+        changedFields: { state_id: { old: oldState, new: newStateId } }
+      });
     }
 
     return ticket;
@@ -267,6 +345,11 @@ export class TicketService {
           ticket.id,
         );
       }
+      
+      this.eventEmitter.emit('ticket.updated', {
+        ticket,
+        changedFields: { owner_id: { old: oldOwner, new: ownerId } }
+      });
     }
 
     return ticket;
@@ -286,5 +369,33 @@ export class TicketService {
   async softDeleteTicket(ticketId: number): Promise<void> {
     // Apenas marca o deleted_at, garantindo a rastreabilidade da Deleção Suave
     await this.ticketRepository.softDelete(ticketId);
+  }
+
+  async getTicketByCsatToken(token: string): Promise<Ticket> {
+    const ticket = await this.ticketRepository.findOne({
+      where: { csat_token: token },
+      relations: { customer: true, owner: true }
+    });
+    if (!ticket) {
+      throw new NotFoundException('Pesquisa de satisfação não encontrada ou token inválido.');
+    }
+    return ticket;
+  }
+
+  async submitCsat(token: string, score: number, comment?: string): Promise<Ticket> {
+    const ticket = await this.getTicketByCsatToken(token);
+    
+    // Se já foi respondido, não deixa responder de novo
+    if (ticket.satisfaction_score) {
+      throw new Error('Esta pesquisa já foi respondida.');
+    }
+
+    ticket.satisfaction_score = score;
+    if (comment) {
+      ticket.satisfaction_comment = comment;
+    }
+    
+    await this.ticketRepository.save(ticket);
+    return ticket;
   }
 }

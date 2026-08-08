@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Header } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { RolesGuard } from '../iam/guards/roles.guard';
@@ -22,5 +22,21 @@ export class ReportsController {
     }
 
     return this.reportsService.getDashboardStats(startDate, endDate);
+  }
+
+  @Get('export')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="tickets-export.csv"')
+  async exportCsv(@Query('days') days?: string) {
+    let startDate: Date | undefined;
+    let endDate: Date | undefined;
+
+    if (days && !isNaN(+days)) {
+      endDate = new Date();
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - parseInt(days, 10));
+    }
+
+    return this.reportsService.exportTicketsCsv(startDate, endDate);
   }
 }

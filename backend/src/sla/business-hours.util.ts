@@ -1,4 +1,5 @@
-import { addDays, addHours, isWeekend, setHours, setMinutes, setSeconds, getHours } from 'date-fns';
+import { addDays, addHours, addMinutes, isWeekend, setHours, setMinutes, setSeconds, getHours, getMinutes, differenceInMinutes } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 /**
  * Utilitário para calcular SLAs com base no calendário comercial.
@@ -11,10 +12,18 @@ export class BusinessHoursUtil {
   /**
    * Adiciona um número de horas úteis a uma data inicial.
    * Pula finais de semana e horários fora do expediente (antes das 08:00 e depois das 18:00).
+   * Considera o fuso horário (padrão: America/Sao_Paulo)
    */
-  static addBusinessHours(startDate: Date, hoursToAdd: number): Date {
-    let currentDate = new Date(startDate);
-    let remainingHours = hoursToAdd;
+  static addBusinessHours(startDate: Date, hoursToAdd: number, timeZone = 'America/Sao_Paulo'): Date {
+    return this.addMinutes(startDate, hoursToAdd * 60, timeZone);
+  }
+
+  /**
+   * Adiciona um número de minutos úteis a uma data inicial.
+   */
+  static addMinutes(startDate: Date, minutesToAdd: number, timeZone = 'America/Sao_Paulo'): Date {
+    let currentDate = toZonedTime(startDate, timeZone);
+    let remainingMinutes = minutesToAdd;
 
     // Se começou no fim de semana, move para segunda-feira às 08:00
     if (isWeekend(currentDate)) {
@@ -29,22 +38,23 @@ export class BusinessHoursUtil {
       currentDate = this.moveToNextBusinessDay(currentDate);
     }
 
-    while (remainingHours > 0) {
-      const hoursUntilEndOfDay = this.END_HOUR - getHours(currentDate);
+    while (remainingMinutes > 0) {
+      const endOfDay = setHours(setMinutes(setSeconds(currentDate, 0), 0), this.END_HOUR);
+      const minutesUntilEndOfDay = differenceInMinutes(endOfDay, currentDate);
 
-      if (remainingHours <= hoursUntilEndOfDay) {
+      if (remainingMinutes <= minutesUntilEndOfDay) {
         // Consegue terminar no mesmo dia
-        currentDate = addHours(currentDate, remainingHours);
-        remainingHours = 0;
+        currentDate = addMinutes(currentDate, remainingMinutes);
+        remainingMinutes = 0;
       } else {
-        // Não consegue terminar hoje, consome as horas até o fim do dia
-        remainingHours -= hoursUntilEndOfDay;
+        // Não consegue terminar hoje, consome os minutos até o fim do dia
+        remainingMinutes -= minutesUntilEndOfDay;
         // Pula para o próximo dia útil às 08:00
         currentDate = this.moveToNextBusinessDay(currentDate);
       }
     }
 
-    return currentDate;
+    return fromZonedTime(currentDate, timeZone);
   }
 
   private static moveToNextBusinessDay(date: Date): Date {

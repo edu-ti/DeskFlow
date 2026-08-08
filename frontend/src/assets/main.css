@@ -10,6 +10,9 @@
 
 @layer utilities {
   .glass-panel {
-    @apply bg-df-panel/80 backdrop-blur-md border border-white/10 shadow-xl;
+    @apply bg-white border border-gray-200 shadow-sm rounded-lg;
+  }
+  .glass-header {
+    @apply bg-white border-b border-gray-200 shadow-sm;
   }
 }
