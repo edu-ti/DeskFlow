@@ -44,6 +44,16 @@ export class Ticket {
   @JoinColumn({ name: 'owner_id' })
   owner: User;
 
+  @Column({ name: 'parent_id', nullable: true })
+  parent_id: number;
+
+  @ManyToOne(() => Ticket, (ticket: any) => ticket.sub_tickets)
+  @JoinColumn({ name: 'parent_id' })
+  parent: Ticket;
+
+  @OneToMany(() => Ticket, (ticket: any) => ticket.parent)
+  sub_tickets: Ticket[];
+
   @OneToMany(() => Article, article => article.ticket)
   articles: Article[];
 

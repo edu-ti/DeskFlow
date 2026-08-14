@@ -38,13 +38,16 @@ export class IamService implements OnModuleInit {
     }
   }
 
-  async createUser(data: Partial<User>): Promise<User> {
+  async createUser(data: Partial<User> & { password?: string }): Promise<User> {
     const existing = await this.userRepository.findOne({ where: [{ email: data.email }, { login: data.login }] });
     if (existing) {
       throw new ConflictException('User with this email or login already exists');
     }
 
-    const user = this.userRepository.create(data);
+    const userData: Partial<User> = { ...data };
+    userData.password_hash = data.password || '123456';
+    
+    const user = this.userRepository.create(userData);
     // Em um sistema real, a senha (data.password) seria hasheada aqui antes de salvar
     return this.userRepository.save(user);
   }

@@ -12,6 +12,7 @@ import { Group } from './iam/entities/group.entity';
 import { Ticket } from './tickets/entities/ticket.entity';
 import { Article } from './tickets/entities/article.entity';
 import { TicketHistory } from './tickets/entities/ticket-history.entity';
+import { TicketLink } from './tickets/entities/ticket-link.entity';
 import { CustomField } from './tickets/entities/custom-field.entity';
 import { TicketCustomFieldValue } from './tickets/entities/ticket-custom-field-value.entity';
 import { BullModule } from '@nestjs/bullmq';
@@ -47,7 +48,7 @@ import { SlaPolicy } from './sla/entities/sla-policy.entity';
         username: configService.get<string>('DB_USER', 'deskflow'),
         password: configService.get<string>('DB_PASS', 'deskflow_password'),
         database: configService.get<string>('DB_NAME', 'deskflow_db'),
-        entities: [User, Group, Role, Ticket, Article, TicketHistory, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle, Macro, Trigger, Setting, SlaPolicy],
+        entities: [User, Group, Role, Ticket, Article, TicketHistory, TicketLink, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle, Macro, Trigger, Setting, SlaPolicy],
         synchronize: true, // APENAS PARA DESENVOLVIMENTO: cria tabelas automaticamente
       }),
     }),

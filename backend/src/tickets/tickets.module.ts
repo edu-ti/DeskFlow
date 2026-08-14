@@ -4,6 +4,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Ticket } from './entities/ticket.entity';
 import { Article } from './entities/article.entity';
 import { TicketHistory } from './entities/ticket-history.entity';
+import { TicketLink } from './entities/ticket-link.entity';
 import { CustomField } from './entities/custom-field.entity';
 import { TicketCustomFieldValue } from './entities/ticket-custom-field-value.entity';
 import { TicketService } from './services/ticket.service';
@@ -21,7 +22,7 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Ticket, Article, TicketHistory, CustomField, TicketCustomFieldValue, SlaPolicy]),
+    TypeOrmModule.forFeature([Ticket, Article, TicketHistory, TicketLink, CustomField, TicketCustomFieldValue, SlaPolicy]),
     BullModule.registerQueue({
       name: SLA_QUEUE_NAME,
     }),

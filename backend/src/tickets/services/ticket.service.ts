@@ -6,6 +6,7 @@ import { Queue } from 'bullmq';
 import { Ticket } from '../entities/ticket.entity';
 import { Article } from '../entities/article.entity';
 import { TicketHistory } from '../entities/ticket-history.entity';
+import { TicketLink } from '../entities/ticket-link.entity';
 import { TicketCustomFieldValue } from '../entities/ticket-custom-field-value.entity';
 import { TicketCreatedEvent } from '../events/ticket-created.event';
 import { SLA_QUEUE_NAME, SlaJobData } from '../../sla/sla-queue.consumer';
@@ -25,6 +26,8 @@ export class TicketService {
     private readonly articleRepository: Repository<Article>,
     @InjectRepository(TicketHistory)
     private readonly historyRepository: Repository<TicketHistory>,
+    @InjectRepository(TicketLink)
+    private readonly linkRepository: Repository<TicketLink>,
     @InjectRepository(TicketCustomFieldValue)
     private readonly customFieldValueRepository: Repository<TicketCustomFieldValue>,
     @InjectQueue(SLA_QUEUE_NAME)
@@ -38,7 +41,7 @@ export class TicketService {
     private readonly whatsappService: WhatsappService,
   ) {}
 
-  async createTicket(data: Partial<Ticket>, initialArticleBody: string, customFields?: { field_id: number, value: string }[]): Promise<Ticket> {
+  async createTicket(data: Partial<Ticket>, initialArticleBody: string, customFields?: { field_id: number, value: string }[], attachments: any[] = []): Promise<Ticket> {
     const newTicket = this.ticketRepository.create(data);
     
     // Busca política de SLA aplicável
@@ -67,6 +70,7 @@ export class TicketService {
       ticket_id: savedTicket.id,
       body: initialArticleBody,
       type: 'note',
+      attachments
     });
     await this.articleRepository.save(article);
 
@@ -195,25 +199,27 @@ export class TicketService {
     };
   }
 
-  async findOne(id: number, user: any): Promise<Ticket> {
+  async findOne(id: number, user?: any): Promise<Ticket> {
+    const isCustomerOnly = user?.roles?.length === 1 && user.roles.includes('customer');
+
     const ticket = await this.ticketRepository.findOne({
       where: { id },
       relations: {
         customer: true,
         owner: true,
+        group: true,
         articles: true,
+        custom_field_values: {
+          custom_field: true,
+        },
+        sub_tickets: true,
+        parent: true,
         history: {
           user: true
-        },
-        custom_field_values: {
-          custom_field: true
         }
       },
       order: {
         articles: {
-          created_at: 'ASC'
-        },
-        history: {
           created_at: 'ASC'
         }
       }
@@ -231,7 +237,7 @@ export class TicketService {
     return ticket;
   }
 
-  async addArticle(ticketId: number, body: string, type: string = 'note', is_internal: boolean = false, actorUserId?: number): Promise<Article> {
+  async addArticle(ticketId: number, body: string, type: string = 'note', is_internal: boolean = false, actorUserId?: number, attachments: any[] = []): Promise<Article> {
     const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
     if (!ticket) {
       throw new NotFoundException('Ticket not found');
@@ -241,7 +247,8 @@ export class TicketService {
       ticket_id: ticketId,
       body,
       type,
-      is_internal
+      is_internal,
+      attachments
     });
 
     const savedArticle = await this.articleRepository.save(article);
@@ -273,7 +280,12 @@ export class TicketService {
        const ticketWithCustomer = await this.ticketRepository.findOne({ where: { id: ticketId }, relations: { customer: true } });
        if (ticketWithCustomer && ticketWithCustomer.customer) {
          if (ticketWithCustomer.source === 'whatsapp' && ticketWithCustomer.customer.phone) {
-           await this.whatsappService.sendMessage(ticketWithCustomer.customer.phone, body);
+           if (attachments && attachments.length > 0 && attachments[0].localPath) {
+             const att = attachments[0];
+             await this.whatsappService.sendMediaMessage(ticketWithCustomer.customer.phone, body, att.localPath, att.mimetype, att.filename);
+           } else if (body) {
+             await this.whatsappService.sendMessage(ticketWithCustomer.customer.phone, body);
+           }
          } else {
            await this.smtpService.sendTicketReplyEmail(ticketWithCustomer, savedArticle, ticketWithCustomer.customer);
          }
@@ -355,6 +367,50 @@ export class TicketService {
     return ticket;
   }
 
+  async transferTicket(ticketId: number, groupId: number, ownerId: number | null, note: string, actorUserId: number): Promise<Ticket> {
+    const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    const oldGroup = ticket.group_id;
+    const oldOwner = ticket.owner_id;
+
+    if (oldGroup !== groupId || oldOwner !== ownerId) {
+      ticket.group_id = groupId;
+      ticket.owner_id = ownerId as any;
+      await this.ticketRepository.save(ticket);
+      
+      // Registrar no histórico a mudança de grupo
+      if (oldGroup !== groupId) {
+        await this.addHistory(ticketId, actorUserId, 'group_id', oldGroup?.toString(), groupId.toString());
+      }
+      // Registrar no histórico a mudança de dono se houver
+      if (oldOwner !== ownerId) {
+        await this.addHistory(ticketId, actorUserId, 'owner_id', oldOwner?.toString() || '', ownerId?.toString() || '');
+      }
+
+      // Adicionar a nota interna com a justificativa
+      await this.addArticle(
+        ticketId,
+        `**Chamado transferido de Setor.**\n\nMotivo da transferência: ${note}`,
+        'note',
+        true, // is_internal
+        actorUserId
+      );
+
+      this.eventEmitter.emit('ticket.updated', {
+        ticket,
+        changedFields: {
+          group_id: { old: oldGroup, new: groupId },
+          owner_id: { old: oldOwner, new: ownerId }
+        }
+      });
+    }
+
+    return ticket;
+  }
+
   private async addHistory(ticketId: number, userId: number, field: string, oldValue: string, newValue: string) {
     const history = this.historyRepository.create({
       ticket_id: ticketId,
@@ -367,8 +423,163 @@ export class TicketService {
   }
 
   async softDeleteTicket(ticketId: number): Promise<void> {
-    // Apenas marca o deleted_at, garantindo a rastreabilidade da Deleção Suave
     await this.ticketRepository.softDelete(ticketId);
+  }
+
+  async changeTitle(ticketId: number, newTitle: string, actorUserId: number): Promise<Ticket> {
+    const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    const oldTitle = ticket.title;
+    if (oldTitle !== newTitle) {
+      ticket.title = newTitle;
+      await this.ticketRepository.save(ticket);
+      
+      await this.addHistory(ticketId, actorUserId, 'title', oldTitle, newTitle);
+      
+      this.eventEmitter.emit('ticket.updated', {
+        ticket,
+        changedFields: { title: { old: oldTitle, new: newTitle } }
+      });
+    }
+
+    return ticket;
+  }
+
+  async mergeTickets(sourceTicketId: number, targetTicketId: number, actorUserId: number): Promise<void> {
+    if (sourceTicketId === targetTicketId) {
+      throw new Error('Cannot merge a ticket into itself');
+    }
+
+    const sourceTicket = await this.ticketRepository.findOne({ where: { id: sourceTicketId }, relations: { articles: true } });
+    const targetTicket = await this.ticketRepository.findOne({ where: { id: targetTicketId } });
+
+    if (!sourceTicket || !targetTicket) {
+      throw new NotFoundException('One or both tickets not found');
+    }
+
+    // 1. Migrate articles
+    await this.articleRepository.update({ ticket: { id: sourceTicketId } }, { ticket: { id: targetTicketId } });
+
+    // 2. Add Internal Notes
+    await this.addArticle(
+      targetTicketId,
+      `Chamado #${sourceTicketId} foi mesclado a este chamado.`,
+      'note',
+      true, // internal
+      actorUserId
+    );
+
+    await this.addArticle(
+      sourceTicketId,
+      `Chamado mesclado ao Ticket #${targetTicketId}.`,
+      'note',
+      true,
+      actorUserId
+    );
+
+    // 3. Close source ticket
+    sourceTicket.state_id = 5; // Resolvido/Mesclado
+    await this.ticketRepository.save(sourceTicket);
+
+    this.eventEmitter.emit('ticket.updated', {
+      ticket: targetTicket,
+    });
+  }
+
+  async linkTickets(sourceTicketId: number, targetTicketId: number, actorUserId: number): Promise<TicketLink> {
+    if (sourceTicketId === targetTicketId) {
+      throw new Error('Cannot link a ticket to itself');
+    }
+
+    const sourceTicket = await this.ticketRepository.findOne({ where: { id: sourceTicketId } });
+    const targetTicket = await this.ticketRepository.findOne({ where: { id: targetTicketId } });
+
+    if (!sourceTicket || !targetTicket) {
+      throw new NotFoundException('One or both tickets not found');
+    }
+
+    const newLink = this.linkRepository.create({
+      source_ticket_id: sourceTicketId,
+      target_ticket_id: targetTicketId,
+      created_by_id: actorUserId,
+    });
+    
+    await this.linkRepository.save(newLink);
+
+    // Add Internal Notes
+    await this.addArticle(
+      sourceTicketId,
+      `Este chamado foi vinculado ao Ticket #${targetTicketId}.`,
+      'note',
+      true, // internal
+      actorUserId
+    );
+    await this.addArticle(
+      targetTicketId,
+      `O Ticket #${sourceTicketId} foi vinculado a este chamado.`,
+      'note',
+      true, // internal
+      actorUserId
+    );
+
+    return newLink;
+  }
+
+  async getLinks(ticketId: number): Promise<TicketLink[]> {
+    return this.linkRepository.find({
+      where: [
+        { source_ticket_id: ticketId },
+        { target_ticket_id: ticketId }
+      ],
+      relations: {
+        source_ticket: true,
+        target_ticket: true
+      }
+    });
+  }
+
+  async createSubticket(parentTicketId: number, actorUserId: number, title: string): Promise<Ticket> {
+    const parentTicket = await this.ticketRepository.findOne({ where: { id: parentTicketId } });
+    
+    if (!parentTicket) {
+      throw new NotFoundException('Parent ticket not found');
+    }
+
+    // Criamos o novo chamado com os mesmos dados básicos, mas amarrado no parent_id
+    const subticket = this.ticketRepository.create({
+      title: title || `[Subprocesso] ${parentTicket.title}`,
+      source: parentTicket.source,
+      group_id: parentTicket.group_id,
+      state_id: 2, // Aberto
+      priority_id: parentTicket.priority_id,
+      customer_id: parentTicket.customer_id,
+      parent_id: parentTicket.id,
+    });
+
+    const savedSubticket = await this.ticketRepository.save(subticket);
+
+    // Nota no filho
+    await this.addArticle(
+      savedSubticket.id,
+      `Subprocesso criado a partir do Ticket #${parentTicket.id}.`,
+      'note',
+      true,
+      actorUserId
+    );
+
+    // Nota no pai
+    await this.addArticle(
+      parentTicket.id,
+      `Subprocesso Ticket #${savedSubticket.id} foi criado.`,
+      'note',
+      true,
+      actorUserId
+    );
+
+    return savedSubticket;
   }
 
   async getTicketByCsatToken(token: string): Promise<Ticket> {

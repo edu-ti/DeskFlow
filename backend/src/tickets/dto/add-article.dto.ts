@@ -2,8 +2,8 @@ import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class AddArticleDto {
   @IsString()
-  @IsNotEmpty()
-  body: string;
+  @IsOptional()
+  body?: string;
 
   @IsString()
   @IsOptional()

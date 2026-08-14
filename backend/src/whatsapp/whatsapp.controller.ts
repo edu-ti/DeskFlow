@@ -41,15 +41,26 @@ export class WhatsappController {
           body.entry[0].changes[0].value.messages &&
           body.entry[0].changes[0].value.messages[0]
         ) {
+          const message = body.entry[0].changes[0].value.messages[0];
           const phoneNumberId = body.entry[0].changes[0].value.metadata.phone_number_id;
-          const from = body.entry[0].changes[0].value.messages[0].from; // sender's phone number
-          const msgBody = body.entry[0].changes[0].value.messages[0].text?.body; // text message
+          const from = message.from; // sender's phone number
+          const type = message.type;
+          
+          let msgBody = '';
+          let media = null;
+
+          if (type === 'text') {
+            msgBody = message.text?.body;
+          } else if (['image', 'audio', 'video', 'document'].includes(type)) {
+            media = message[type];
+            msgBody = media.caption || `[Mídia recebida: ${type}]`;
+          }
           
           const contacts = body.entry[0].changes[0].value.contacts;
           const profileName = contacts && contacts[0] ? contacts[0].profile.name : 'Unknown';
 
-          if (msgBody) {
-            await this.whatsappService.handleIncomingMessage(from, profileName, msgBody, phoneNumberId);
+          if (msgBody || media) {
+            await this.whatsappService.handleIncomingMessage(from, profileName, msgBody, phoneNumberId, media);
           }
         }
         res.sendStatus(HttpStatus.OK);

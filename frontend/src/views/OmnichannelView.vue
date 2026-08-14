@@ -96,7 +96,7 @@
           </div>
           
           <div class="flex items-center space-x-2">
-            <select v-model="selectedTicket.state_id" @change="updateTicketState(selectedTicket.state_id)" class="text-sm border-gray-300 rounded-md focus:ring-df-primary focus:border-df-primary bg-white h-9">
+            <select v-model="selectedTicket.state_id" @change="changeStatus(selectedTicket.state_id)" class="text-sm border-gray-300 rounded-md focus:ring-df-primary focus:border-df-primary bg-white h-9">
               <option :value="1">Triagem</option>
               <option :value="2">Aberto</option>
               <option :value="3">Em Atendimento</option>
@@ -105,10 +105,31 @@
               <option :value="5">Resolvido</option>
             </select>
             
-            <button class="flex items-center px-3 h-9 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-md transition-colors">
-              <ZapIcon class="w-4 h-4 mr-1.5" />
-              Ações
-            </button>
+            <div class="relative">
+              <button @click="showActionsMenu = !showActionsMenu" class="flex items-center px-3 h-9 bg-df-primary hover:bg-df-primary-hover text-white text-sm font-medium rounded-md transition-colors" title="Ações Rápidas">
+                <ZapIcon class="w-4 h-4 mr-1.5" />
+                Ações
+              </button>
+              
+              <!-- Dropdown de Ações -->
+              <div v-if="showActionsMenu" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-100">
+                <button @click="quickAction('alterar_assunto')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                  Alterar assunto
+                </button>
+                <button @click="quickAction('mesclar')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                  Mesclar chamado
+                </button>
+                <button @click="quickAction('vincular')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                  Vincular a um chamado
+                </button>
+                <button @click="quickAction('subprocesso')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                  Criar subprocesso
+                </button>
+                <button @click="quickAction('transferir')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                  Transferir Setor
+                </button>
+              </div>
+            </div>
 
             <button @click="toggleInfoSidebar" class="flex items-center px-3 h-9 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-md transition-colors" title="Informações do Chamado">
               <InfoIcon class="w-4 h-4 mr-1.5" />
@@ -144,7 +165,28 @@
                 
                 <!-- Normal Message -->
                 <template v-else>
-                  <p class="whitespace-pre-wrap text-sm leading-relaxed" v-html="formatMessage(msg.body)"></p>
+                  <p v-if="msg.body && !msg.body.startsWith('[Mídia recebida')" class="whitespace-pre-wrap text-sm leading-relaxed" v-html="formatMessage(msg.body)"></p>
+                  
+                  <!-- Attachments -->
+                  <div v-if="msg.attachments && msg.attachments.length > 0" class="mt-2 space-y-2">
+                    <div v-for="(att, idx) in msg.attachments" :key="idx" class="max-w-full">
+                      <!-- Imagem -->
+                      <img v-if="att.mimetype && att.mimetype.startsWith('image/')" :src="backendUrl + att.url" class="rounded-lg max-h-64 object-contain cursor-pointer" @click="openImage(backendUrl + att.url)" />
+                      <!-- Video -->
+                      <video v-else-if="att.mimetype && att.mimetype.startsWith('video/')" :src="backendUrl + att.url" controls class="rounded-lg max-h-64 w-full"></video>
+                      <!-- Audio -->
+                      <audio v-else-if="att.mimetype && att.mimetype.startsWith('audio/')" :src="backendUrl + att.url" controls class="w-full min-w-[220px] max-w-[280px]"></audio>
+                      <!-- Documento -->
+                      <a v-else :href="backendUrl + att.url" target="_blank" class="flex items-center p-3 bg-white/50 rounded-lg border border-black/5 hover:bg-white/80 transition-colors">
+                        <FileIcon class="w-6 h-6 text-gray-500 mr-2 flex-shrink-0" />
+                        <div class="truncate min-w-0">
+                          <p class="text-sm font-medium text-gray-800 truncate">{{ att.filename || 'Arquivo' }}</p>
+                          <p class="text-[10px] text-gray-500 uppercase">{{ att.mimetype ? att.mimetype.split('/')[1] : 'Documento' }}</p>
+                        </div>
+                      </a>
+                    </div>
+                  </div>
+
                   <div class="flex items-center justify-end mt-1 space-x-1">
                     <span class="text-[10px] text-gray-500">{{ formatTime(msg.created_at) }}</span>
                     <!-- Fake read receipt for agent messages -->
@@ -158,7 +200,51 @@
 
         <!-- Chat Input -->
         <div class="p-4 bg-gray-50 border-t border-gray-200">
-          <div class="flex items-end bg-white rounded-xl border border-gray-300 shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-df-primary focus-within:border-transparent transition-all">
+          
+          <!-- File Preview -->
+          <div v-if="selectedFile" class="mb-3 flex items-center p-2 bg-white rounded-lg border border-gray-200 shadow-sm inline-block max-w-[200px] relative group">
+            <button @click="removeFile" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+              <XIcon class="w-3 h-3" />
+            </button>
+            <img v-if="previewUrl && selectedFile.type.startsWith('image/')" :src="previewUrl" class="w-12 h-12 object-cover rounded-md mr-3 border border-gray-100" />
+            <video v-else-if="previewUrl && selectedFile.type.startsWith('video/')" :src="previewUrl" class="w-12 h-12 object-cover rounded-md mr-3 border border-gray-100"></video>
+            <div v-else class="w-12 h-12 bg-gray-100 rounded-md mr-3 flex items-center justify-center flex-shrink-0">
+              <FileIcon class="w-6 h-6 text-gray-400" />
+            </div>
+            <div class="truncate text-xs text-gray-700 font-medium flex-1 pr-2">
+              {{ selectedFile.name }}
+            </div>
+          </div>
+
+          <div class="flex items-end bg-white rounded-xl border border-gray-300 shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-df-primary focus-within:border-transparent transition-all relative">
+            
+            <!-- Recording UI Overlay -->
+            <div v-if="isRecording" class="absolute inset-0 bg-red-50 flex items-center justify-between px-4 z-10">
+              <div class="flex items-center text-red-500 animate-pulse">
+                <MicIcon class="w-5 h-5 mr-2" />
+                <span class="font-medium font-mono">{{ formatRecordingTime(recordingTime) }}</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button @click="cancelRecording" class="p-2 text-gray-500 hover:text-red-500 transition-colors text-sm font-medium">
+                  Cancelar
+                </button>
+                <button @click="stopRecording" class="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm">
+                  <SquareIcon class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+
+            <button 
+              @click="triggerFileInput"
+              class="p-3 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+              title="Anexar arquivo"
+              :class="{ 'invisible': isRecording }"
+            >
+              <PaperclipIcon class="w-5 h-5" />
+            </button>
+            <input type="file" class="hidden" ref="fileInputRef" @change="handleFileSelect" accept="image/*,video/*,audio/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+            
             <textarea 
               v-model="newMessage"
               @keydown.enter.prevent="sendMessage"
@@ -167,11 +253,25 @@
               rows="1"
               @input="adjustTextareaHeight"
               ref="textareaRef"
+              :class="{ 'invisible': isRecording }"
             ></textarea>
+
+            <!-- Send or Mic Button -->
             <button 
+              v-if="!newMessage.trim() && !selectedFile"
+              @click="startRecording"
+              class="p-3 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+              title="Gravar áudio"
+              :class="{ 'invisible': isRecording }"
+            >
+              <MicIcon class="w-5 h-5" />
+            </button>
+            <button 
+              v-else
               @click="sendMessage"
-              :disabled="!newMessage.trim() || isSending"
+              :disabled="isSending"
               class="p-3 text-df-primary hover:text-df-primary-hover disabled:opacity-50 transition-colors flex-shrink-0"
+              :class="{ 'invisible': isRecording }"
             >
               <SendIcon class="w-5 h-5" v-if="!isSending" />
               <Loader2Icon class="w-5 h-5 animate-spin" v-else />
@@ -209,17 +309,76 @@
         </div>
 
         <div class="mb-6">
-          <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Status Atual</p>
-          <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-            {{ tabs.find(t => t.id === selectedTicket.state_id)?.label || 'Desconhecido' }}
-          </span>
+          <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">Status Atual</p>
+          <div class="flex items-center space-x-2">
+            <select 
+              v-model="selectedTicket.state_id" 
+              @change="changeStatus(selectedTicket.state_id)"
+              class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:border-df-primary focus:ring focus:ring-df-primary focus:ring-opacity-50"
+              :disabled="isChangingStatus"
+            >
+              <option v-for="tab in tabs" :key="tab.id" :value="tab.id">
+                {{ tab.label }}
+              </option>
+            </select>
+            <Loader2Icon v-if="isChangingStatus" class="w-5 h-5 text-gray-400 animate-spin" />
+          </div>
         </div>
         
+        <div class="mb-6">
+          <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">Atribuído para (Agente)</p>
+          <div class="flex items-center space-x-2">
+            <select 
+              v-model="selectedTicket.owner_id"
+              @change="assignTicket(selectedTicket.owner_id)"
+              class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:border-df-primary focus:ring focus:ring-df-primary focus:ring-opacity-50"
+              :disabled="isAssigning"
+            >
+              <option :value="null">Não atribuído (Fila)</option>
+              <option v-for="agent in agents" :key="agent.id" :value="agent.id">
+                {{ agent.firstname }} {{ agent.lastname }}
+              </option>
+            </select>
+            <Loader2Icon v-if="isAssigning" class="w-5 h-5 text-gray-400 animate-spin" />
+          </div>
+        </div>
+
         <div class="mb-6">
           <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Criado em</p>
           <p class="text-sm text-gray-800">
             {{ new Date(selectedTicket.created_at).toLocaleString('pt-BR') }}
           </p>
+        </div>
+
+        <!-- Hierarquia -->
+        <div class="pt-4 border-t border-gray-100">
+          <h3 class="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Hierarquia</h3>
+          <div class="space-y-3">
+            <div v-if="selectedTicket.parent">
+              <span class="block text-xs font-medium text-gray-500">Processo Principal Pai</span>
+              <span class="block text-sm text-df-primary font-medium cursor-pointer">#{{ selectedTicket.parent.id }} - {{ selectedTicket.parent.title }}</span>
+            </div>
+            <div v-if="selectedTicket.sub_tickets && selectedTicket.sub_tickets.length > 0">
+              <span class="block text-xs font-medium text-gray-500">Subprocessos Ativos</span>
+              <ul class="mt-1 space-y-1">
+                <li v-for="sub in selectedTicket.sub_tickets" :key="sub.id" class="text-sm text-df-primary font-medium cursor-pointer">
+                  #{{ sub.id }} - {{ sub.title }}
+                </li>
+              </ul>
+            </div>
+            <div v-if="ticketLinks && ticketLinks.length > 0">
+              <span class="block text-xs font-medium text-gray-500 mt-2">Chamados Vinculados</span>
+              <ul class="mt-1 space-y-1">
+                <li v-for="link in ticketLinks" :key="link.id" class="text-sm text-df-primary font-medium cursor-pointer">
+                  <span v-if="link.source_ticket_id === selectedTicket.id">#{{ link.target_ticket_id }} - {{ link.target_ticket.title }}</span>
+                  <span v-else>#{{ link.source_ticket_id }} - {{ link.source_ticket.title }}</span>
+                </li>
+              </ul>
+            </div>
+            <div v-if="(!selectedTicket.sub_tickets || selectedTicket.sub_tickets.length === 0) && (!ticketLinks || ticketLinks.length === 0) && !selectedTicket.parent">
+              <span class="block text-xs italic text-gray-400">Nenhum vínculo ou subprocesso</span>
+            </div>
+          </div>
         </div>
         
         <!-- Action to open full ticket -->
@@ -229,16 +388,164 @@
         </button>
       </div>
     </div>
+    <!-- Modais Customizados -->
+    <!-- Modal: Alterar Assunto -->
+    <div v-if="showSubjectModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Alterar Assunto</h3>
+        <input 
+          type="text" 
+          v-model="newSubject" 
+          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-df-primary focus:border-transparent mb-6"
+          placeholder="Digite o novo assunto"
+          @keyup.enter="confirmSubjectChange"
+        />
+        <div class="flex justify-end space-x-3">
+          <button @click="showSubjectModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+            Cancelar
+          </button>
+          <button @click="confirmSubjectChange" class="px-4 py-2 text-sm font-medium text-white bg-df-primary hover:bg-df-primary-hover rounded-md transition-colors" :disabled="isChangingSubject">
+            <span v-if="!isChangingSubject">Salvar</span>
+            <Loader2Icon v-else class="w-4 h-4 animate-spin" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Mesclar Chamado -->
+    <div v-if="showMergeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Mesclar Chamado</h3>
+        <p class="text-sm text-gray-500 mb-4">
+          Digite o Número/ID do chamado de <strong>destino</strong>. As mensagens deste chamado atual ({{ selectedTicket?.id }}) serão transferidas para lá e este será finalizado.
+        </p>
+        <input 
+          type="number" 
+          v-model="mergeTargetId" 
+          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-df-primary focus:border-transparent mb-6"
+          placeholder="Ex: 15"
+          @keyup.enter="confirmMerge"
+        />
+        <div class="flex justify-end space-x-3">
+          <button @click="showMergeModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+            Cancelar
+          </button>
+          <button @click="confirmMerge" class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors" :disabled="isMerging">
+            <span v-if="!isMerging">Mesclar e Finalizar</span>
+            <Loader2Icon v-else class="w-4 h-4 animate-spin" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Vincular Chamado -->
+    <div v-if="showLinkModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Vincular Chamado</h3>
+        <p class="text-sm text-gray-500 mb-4">
+          Digite o Número/ID do chamado que você quer vincular a este ({{ selectedTicket?.id }}).
+        </p>
+        <input 
+          type="number" 
+          v-model="linkTargetId" 
+          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-df-primary focus:border-transparent mb-6"
+          placeholder="Ex: 22"
+          @keyup.enter="confirmLink"
+        />
+        <div class="flex justify-end space-x-3">
+          <button @click="showLinkModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+            Cancelar
+          </button>
+          <button @click="confirmLink" class="px-4 py-2 text-sm font-medium text-white bg-df-primary hover:bg-df-primary-hover rounded-md transition-colors" :disabled="isLinking">
+            <span v-if="!isLinking">Vincular</span>
+            <Loader2Icon v-else class="w-4 h-4 animate-spin" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Subprocesso -->
+    <div v-if="showSubticketModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Criar Subprocesso</h3>
+        <input 
+          type="text" 
+          v-model="subticketTitle" 
+          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-df-primary focus:border-transparent mb-6"
+          placeholder="Título do novo subprocesso"
+          @keyup.enter="confirmSubticket"
+        />
+        <div class="flex justify-end space-x-3">
+          <button @click="showSubticketModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+            Cancelar
+          </button>
+          <button @click="confirmSubticket" class="px-4 py-2 text-sm font-medium text-white bg-df-primary hover:bg-df-primary-hover rounded-md transition-colors" :disabled="isCreatingSubticket">
+            <span v-if="!isCreatingSubticket">Criar</span>
+            <Loader2Icon v-else class="w-4 h-4 animate-spin" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Transferir Setor -->
+    <div v-if="showTransferModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Transferir Setor</h3>
+        <p class="text-sm text-gray-500 mb-4">
+          Escolha o grupo de destino e adicione o motivo da transferência.
+        </p>
+        
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Grupo de Destino *</label>
+          <select v-model="transferGroupId" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-df-primary focus:border-transparent">
+            <option disabled value="">Selecione um grupo</option>
+            <option v-for="group in availableGroups" :key="group.id" :value="group.id">{{ group.name }}</option>
+          </select>
+        </div>
+
+        <div class="mb-4" v-if="transferGroupId">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Atendente (Opcional)</label>
+          <select v-model="transferOwnerId" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-df-primary focus:border-transparent">
+            <option value="">Fila Geral (Nenhum)</option>
+            <option v-for="user in filteredUsersForGroup" :key="user.id" :value="user.id">{{ user.firstname }} {{ user.lastname }}</option>
+          </select>
+        </div>
+
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Motivo (Nota Interna) *</label>
+          <textarea 
+            v-model="transferNote" 
+            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-df-primary focus:border-transparent resize-none"
+            rows="3"
+            placeholder="Descreva o motivo desta transferência..."
+          ></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-3">
+          <button @click="showTransferModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors">
+            Cancelar
+          </button>
+          <button @click="confirmTransfer" class="px-4 py-2 text-sm font-medium text-white bg-df-primary hover:bg-df-primary-hover rounded-md transition-colors" :disabled="isTransferring || !transferGroupId || !transferNote.trim()">
+            <span v-if="!isTransferring">Transferir</span>
+            <Loader2Icon v-else class="w-4 h-4 animate-spin" />
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search as SearchIcon, MessageCircle as MessageCircleIcon, Send as SendIcon, Loader2 as Loader2Icon, ExternalLink as ExternalLinkIcon, CheckCheck as CheckCheckIcon, Zap as ZapIcon, Info as InfoIcon } from 'lucide-vue-next'
+import { Search as SearchIcon, MessageCircle as MessageCircleIcon, Send as SendIcon, Loader2 as Loader2Icon, ExternalLink as ExternalLinkIcon, CheckCheck as CheckCheckIcon, Zap as ZapIcon, Info as InfoIcon, File as FileIcon, Paperclip as PaperclipIcon, X as XIcon, Mic as MicIcon, Square as SquareIcon } from 'lucide-vue-next'
 import api from '@/services/api'
+import { iamService } from '@/services/iamService'
 import { socketService } from '@/services/socketService'
 import { useToast } from '@/composables/useToast'
+
+const backendUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api$/, '') : 'http://localhost:3000'
+
 
 const router = useRouter()
 const { success: toastSuccess, error: toastError } = useToast()
@@ -248,9 +555,55 @@ const tabs = [
   { id: 2, label: 'Aberto' },
   { id: 3, label: 'Em Atendimento' },
   { id: 4, label: 'Pendente' },
+  { id: 'presencial', label: 'Presencial' },
   { id: 6, label: 'Dúvida' },
   { id: 5, label: 'Resolvido' },
 ]
+
+const agents = ref<any[]>([])
+const isChangingStatus = ref(false)
+const isAssigning = ref(false)
+const showActionsMenu = ref(false)
+
+const fetchAgents = async () => {
+  try {
+    const res = await api.get('/iam/users')
+    agents.value = res.data
+  } catch (err) {
+    console.error('Erro ao buscar agentes:', err)
+  }
+}
+
+// Modal States
+const showSubjectModal = ref(false)
+const newSubject = ref('')
+const isChangingSubject = ref(false)
+
+const showMergeModal = ref(false)
+const mergeTargetId = ref('')
+const isMerging = ref(false)
+
+const showLinkModal = ref(false)
+const linkTargetId = ref('')
+const isLinking = ref(false)
+const ticketLinks = ref<any[]>([])
+
+const showSubticketModal = ref(false)
+const subticketTitle = ref('')
+const isCreatingSubticket = ref(false)
+
+const showTransferModal = ref(false)
+const transferGroupId = ref<number | ''>('')
+const transferOwnerId = ref<number | ''>('')
+const transferNote = ref('')
+const isTransferring = ref(false)
+const availableGroups = ref<any[]>([])
+const allUsers = ref<any[]>([])
+
+const filteredUsersForGroup = computed(() => {
+  if (!transferGroupId.value) return []
+  return allUsers.value.filter(u => u.groups?.some((g: any) => g.id === transferGroupId.value))
+})
 
 const activeTab = ref(2) // Default Aberto
 const searchQuery = ref('')
@@ -264,6 +617,16 @@ const isSending = ref(false)
 const showInfoSidebar = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const selectedFile = ref<File | null>(null)
+const previewUrl = ref<string | null>(null)
+
+// Audio recording state
+const isRecording = ref(false)
+const recordingTime = ref(0)
+const recordingInterval = ref<any>(null)
+let mediaRecorder: MediaRecorder | null = null
+let audioChunks: Blob[] = []
 
 // Current logged user
 const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
@@ -282,7 +645,24 @@ const fetchTickets = async () => {
 }
 
 const filteredTickets = computed(() => {
-  let filtered = tickets.value.filter(t => t.state_id === activeTab.value)
+  let filtered = tickets.value
+  const presencialGroup = availableGroups.value.find(g => g.name.toLowerCase().includes('presencial'))
+
+  if (activeTab.value === 'presencial') {
+    if (presencialGroup) {
+      filtered = filtered.filter(t => t.group_id === presencialGroup.id)
+    } else {
+      filtered = []
+    }
+  } else {
+    // Se estiver em outra aba, não exibe os presenciais
+    if (presencialGroup) {
+      filtered = filtered.filter(t => t.state_id === activeTab.value && t.group_id !== presencialGroup.id)
+    } else {
+      filtered = filtered.filter(t => t.state_id === activeTab.value)
+    }
+  }
+
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     filtered = filtered.filter(t => 
@@ -293,14 +673,193 @@ const filteredTickets = computed(() => {
   return filtered
 })
 
-const getTicketCount = (stateId: number) => {
+const getTicketCount = (stateId: any) => {
+  const presencialGroup = availableGroups.value.find(g => g.name.toLowerCase().includes('presencial'))
+  
+  if (stateId === 'presencial') {
+    if (!presencialGroup) return 0
+    return tickets.value.filter(t => t.group_id === presencialGroup.id).length
+  }
+  
+  if (presencialGroup) {
+    return tickets.value.filter(t => t.state_id === stateId && t.group_id !== presencialGroup.id).length
+  }
   return tickets.value.filter(t => t.state_id === stateId).length
+}
+
+const quickAction = async (action: string) => {
+  showActionsMenu.value = false
+  if (action === 'alterar_assunto') {
+    newSubject.value = selectedTicket.value?.title || ''
+    showSubjectModal.value = true
+  } else if (action === 'mesclar') {
+    mergeTargetId.value = ''
+    showMergeModal.value = true
+  } else if (action === 'vincular') {
+    linkTargetId.value = ''
+    showLinkModal.value = true
+  } else if (action === 'subprocesso') {
+    subticketTitle.value = `[Subprocesso] ${selectedTicket.value?.title || ''}`
+    showSubticketModal.value = true
+  } else if (action === 'transferir') {
+    transferGroupId.value = ''
+    transferOwnerId.value = ''
+    transferNote.value = ''
+    showTransferModal.value = true
+    
+    // Fetch groups and users if empty
+    if (availableGroups.value.length === 0) {
+      iamService.getGroups().then(g => availableGroups.value = g).catch(console.error)
+    }
+    if (allUsers.value.length === 0) {
+      iamService.getUsers().then(u => allUsers.value = u).catch(console.error)
+    }
+  }
+}
+
+const confirmSubjectChange = async () => {
+  if (!selectedTicket.value || !newSubject.value.trim() || newSubject.value === selectedTicket.value.title) {
+    showSubjectModal.value = false
+    return
+  }
+  isChangingSubject.value = true
+  try {
+    await api.patch(`/tickets/${selectedTicket.value.id}/title`, { title: newSubject.value.trim() })
+    selectedTicket.value.title = newSubject.value.trim()
+    const tIndex = tickets.value.findIndex(t => t.id === selectedTicket.value!.id)
+    if (tIndex > -1) {
+      tickets.value[tIndex].title = newSubject.value.trim()
+    }
+    toastSuccess('Sucesso', 'Assunto alterado com sucesso.')
+    showSubjectModal.value = false
+  } catch (err) {
+    toastError('Erro', 'Falha ao alterar o assunto.')
+  } finally {
+    isChangingSubject.value = false
+  }
+}
+
+const confirmMerge = async () => {
+  const targetId = parseInt(mergeTargetId.value, 10)
+  if (!selectedTicket.value || isNaN(targetId) || targetId === selectedTicket.value.id) {
+    toastError('Erro', 'ID de destino inválido.')
+    return
+  }
+  
+  isMerging.value = true
+  try {
+    await api.post(`/tickets/${selectedTicket.value.id}/merge`, { target_ticket_id: targetId })
+    toastSuccess('Sucesso', 'Chamado mesclado com sucesso!')
+    
+    // Remove local
+    const tIndex = tickets.value.findIndex(t => t.id === selectedTicket.value!.id)
+    if (tIndex > -1) {
+      tickets.value.splice(tIndex, 1)
+    }
+    selectedTicket.value = null
+    showMergeModal.value = false
+  } catch (err) {
+    toastError('Erro', 'Falha ao mesclar o chamado. Verifique se o ID destino existe.')
+  } finally {
+    isMerging.value = false
+  }
+}
+
+const confirmLink = async () => {
+  const targetId = parseInt(linkTargetId.value, 10)
+  if (!selectedTicket.value || isNaN(targetId) || targetId === selectedTicket.value.id) {
+    toastError('Erro', 'ID de destino inválido.')
+    return
+  }
+  
+  isLinking.value = true
+  try {
+    const res = await api.post(`/tickets/${selectedTicket.value.id}/links`, { target_ticket_id: targetId })
+    toastSuccess('Sucesso', 'Chamado vinculado com sucesso!')
+    ticketLinks.value.push(res.data) // Atualiza tela
+    showLinkModal.value = false
+  } catch (err) {
+    toastError('Erro', 'Falha ao vincular o chamado. Verifique se o ID destino existe.')
+  } finally {
+    isLinking.value = false
+  }
+}
+
+const confirmSubticket = async () => {
+  if (!selectedTicket.value || !subticketTitle.value.trim()) {
+    toastError('Erro', 'Título do subprocesso não pode ser vazio.')
+    return
+  }
+  
+  isCreatingSubticket.value = true
+  try {
+    const res = await api.post(`/tickets/${selectedTicket.value.id}/subtickets`, { title: subticketTitle.value.trim() })
+    toastSuccess('Sucesso', 'Subprocesso criado com sucesso!')
+    if (!selectedTicket.value.sub_tickets) {
+      selectedTicket.value.sub_tickets = []
+    }
+    selectedTicket.value.sub_tickets.push(res.data)
+    
+    // Insere o novo subprocesso na lista local se corresponder ao filtro ativo
+    if (activeTab.value === 2) { // "Aberto" é 2 por padrão
+      tickets.value.unshift(res.data)
+    }
+
+    showSubticketModal.value = false
+  } catch (err) {
+    toastError('Erro', 'Falha ao criar o subprocesso.')
+  } finally {
+    isCreatingSubticket.value = false
+  }
+}
+
+const confirmTransfer = async () => {
+  if (!selectedTicket.value || !transferGroupId.value || !transferNote.value.trim()) {
+    toastError('Erro', 'Grupo de destino e motivo são obrigatórios.')
+    return
+  }
+  
+  isTransferring.value = true
+  try {
+    await api.post(`/tickets/${selectedTicket.value.id}/transfer`, {
+      group_id: transferGroupId.value,
+      owner_id: transferOwnerId.value || undefined,
+      note: transferNote.value.trim()
+    })
+    toastSuccess('Sucesso', 'Chamado transferido com sucesso!')
+    
+    // Atualiza localmente o ticket ao invés de apagá-lo,
+    // assim ele apenas vai para a aba correta se mudar o grupo.
+    const tIndex = tickets.value.findIndex(t => t.id === selectedTicket.value!.id)
+    if (tIndex > -1) {
+      tickets.value[tIndex].group_id = transferGroupId.value
+      tickets.value[tIndex].owner_id = transferOwnerId.value || null
+    }
+    selectedTicket.value = null
+    showTransferModal.value = false
+  } catch (err) {
+    toastError('Erro', 'Falha ao transferir o chamado.')
+  } finally {
+    isTransferring.value = false
+  }
+}
+
+const fetchLinks = async (ticketId: number) => {
+  try {
+    const res = await api.get(`/tickets/${ticketId}/links`)
+    ticketLinks.value = res.data
+  } catch (err) {
+    console.error('Falha ao buscar links', err)
+  }
 }
 
 const selectTicket = async (ticket: any) => {
   selectedTicket.value = ticket
   ticket.unread = false // mark as read locally
+  ticketLinks.value = [] // Limpa o estado
+  
   await loadMessages(ticket.id)
+  await fetchLinks(ticket.id)
 }
 
 const loadMessages = async (ticketId: number) => {
@@ -308,6 +867,8 @@ const loadMessages = async (ticketId: number) => {
   try {
     const res = await api.get(`/tickets/${ticketId}`)
     const fullTicket = res.data
+    selectedTicket.value = fullTicket // Atualiza com dados completos (customer, sub_tickets, parent, etc)
+    
     // Map articles to chat messages
     messages.value = fullTicket.articles.map((art: any) => {
       // Determine if sender is agent or customer based on who created it
@@ -319,10 +880,15 @@ const loadMessages = async (ticketId: number) => {
         created_at: art.created_at,
         isInternal: art.is_internal,
         senderType: isAgent ? 'agent' : 'customer',
-        isSystem: art.type === 'system'
+        isSystem: art.type === 'system',
+        attachments: art.attachments || []
       }
     })
-    scrollToBottom()
+    
+    nextTick(() => {
+      scrollToBottom()
+    })
+    fetchAgents()
   } catch (err) {
     toastError('Erro', 'Não foi possível carregar as mensagens.')
   } finally {
@@ -353,28 +919,124 @@ const adjustTextareaHeight = () => {
   }
 }
 
+const triggerFileInput = () => {
+  fileInputRef.value?.click()
+}
+
+const handleFileSelect = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    const file = target.files[0]
+    selectedFile.value = file as any
+    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      previewUrl.value = URL.createObjectURL(file)
+    } else {
+      previewUrl.value = null
+    }
+  }
+}
+
+const removeFile = () => {
+  selectedFile.value = null
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = null
+  }
+  if (fileInputRef.value) {
+    fileInputRef.value.value = ''
+  }
+}
+
+const formatRecordingTime = (seconds: number) => {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0')
+  const s = (seconds % 60).toString().padStart(2, '0')
+  return `${m}:${s}`
+}
+
+const startRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaRecorder = new MediaRecorder(stream)
+    audioChunks = []
+    
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data)
+    }
+    
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
+      const audioFile = new File([audioBlob], `audio_${Date.now()}.webm`, { type: 'audio/webm' })
+      selectedFile.value = audioFile as any
+      previewUrl.value = URL.createObjectURL(audioBlob)
+      
+      // Stop all tracks to release microphone
+      stream.getTracks().forEach(track => track.stop())
+    }
+    
+    mediaRecorder.start()
+    isRecording.value = true
+    recordingTime.value = 0
+    recordingInterval.value = setInterval(() => {
+      recordingTime.value++
+    }, 1000)
+    
+  } catch (err) {
+    toastError('Erro', 'Não foi possível acessar o microfone.')
+  }
+}
+
+const stopRecording = () => {
+  if (mediaRecorder && isRecording.value) {
+    mediaRecorder.stop()
+    isRecording.value = false
+    clearInterval(recordingInterval.value)
+  }
+}
+
+const cancelRecording = () => {
+  if (mediaRecorder && isRecording.value) {
+    mediaRecorder.stop()
+    setTimeout(() => {
+      removeFile()
+    }, 50)
+    isRecording.value = false
+    clearInterval(recordingInterval.value)
+  }
+}
+
 const sendMessage = async () => {
-  if (!newMessage.value.trim() || !selectedTicket.value) return
+  if ((!newMessage.value.trim() && !selectedFile.value) || !selectedTicket.value) return
   
   isSending.value = true
   try {
-    const res = await api.post(`/tickets/${selectedTicket.value.id}/articles`, {
-      body: newMessage.value.trim(),
-      type: 'note',
-      is_internal: false
+    const formData = new FormData()
+    formData.append('body', newMessage.value.trim() || '[Mídia enviada]')
+    formData.append('type', 'note')
+    formData.append('is_internal', 'false')
+    
+    if (selectedFile.value) {
+      formData.append('file', selectedFile.value)
+    }
+
+    const res = await api.post(`/tickets/${selectedTicket.value.id}/articles`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
     })
     
     // Add to local list optimistically
     messages.value.push({
-      id: res.data.id,
+      id: res.data.id || Date.now(),
       body: newMessage.value.trim(),
       created_at: new Date().toISOString(),
       isInternal: false,
       senderType: 'agent',
-      isSystem: false
+      isSystem: false,
+      attachments: res.data.attachments || []
     })
     
     newMessage.value = ''
+    removeFile()
     if (textareaRef.value) textareaRef.value.style.height = 'auto'
     scrollToBottom()
     
@@ -393,22 +1055,43 @@ const sendMessage = async () => {
   }
 }
 
-const updateTicketState = async (newStateId: number) => {
+const changeStatus = async (statusId: number) => {
   if (!selectedTicket.value) return
+  isChangingStatus.value = true
   try {
-    await api.patch(`/tickets/${selectedTicket.value.id}/state`, { state_id: newStateId })
-    toastSuccess('Sucesso', 'Status atualizado com sucesso.')
-    
-    // Locally update ticket state
-    const t = tickets.value.find(t => t.id === selectedTicket.value.id)
-    if (t) t.state_id = newStateId
+    await api.patch(`/tickets/${selectedTicket.value.id}/state`, { state_id: statusId })
+    // Local Update
+    const tIndex = tickets.value.findIndex(t => t.id === selectedTicket.value!.id)
+    if (tIndex > -1) {
+      tickets.value[tIndex].state_id = statusId
+    }
+    toastSuccess('Sucesso', 'Status atualizado.')
     
     // Deselect if it moved out of current tab
-    if (newStateId !== activeTab.value) {
+    if (statusId !== activeTab.value) {
       selectedTicket.value = null
     }
   } catch (err) {
-    toastError('Erro', 'Falha ao atualizar status.')
+    toastError('Erro', 'Falha ao mudar status.')
+  } finally {
+    isChangingStatus.value = false
+  }
+}
+
+const assignTicket = async (ownerId: number | null) => {
+  if (!selectedTicket.value) return
+  isAssigning.value = true
+  try {
+    await api.patch(`/tickets/${selectedTicket.value.id}/assign`, { owner_id: ownerId })
+    const tIndex = tickets.value.findIndex(t => t.id === selectedTicket.value!.id)
+    if (tIndex > -1) {
+      tickets.value[tIndex].owner_id = ownerId
+    }
+    toastSuccess('Sucesso', 'Chamado transferido.')
+  } catch (err) {
+    toastError('Erro', 'Falha ao transferir chamado.')
+  } finally {
+    isAssigning.value = false
   }
 }
 
@@ -430,6 +1113,10 @@ const scrollToBottom = () => {
   })
 }
 
+const openImage = (url: string) => {
+  window.open(url, '_blank')
+}
+
 // Socket listening for new messages
 const handleSocketMessage = (data: any) => {
   if (data.ticket.source !== 'whatsapp') return
@@ -445,7 +1132,8 @@ const handleSocketMessage = (data: any) => {
         created_at: data.article.created_at,
         isInternal: data.article.is_internal,
         senderType: isAgent ? 'agent' : 'customer',
-        isSystem: data.article.type === 'system'
+        isSystem: data.article.type === 'system',
+        attachments: data.article.attachments || []
       })
       scrollToBottom()
     }

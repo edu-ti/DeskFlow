@@ -22,6 +22,9 @@ export class Article {
   @Column({ default: false })
   is_internal: boolean;
 
+  @Column('simple-json', { nullable: true })
+  attachments: any[];
+
   @CreateDateColumn()
   created_at: Date;
 
