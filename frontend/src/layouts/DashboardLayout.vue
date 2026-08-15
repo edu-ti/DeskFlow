@@ -208,6 +208,7 @@
                 @input="handleSearchInput" 
                 @focus="isSearchFocused = true"
                 @blur="handleSearchBlur"
+                @keyup.enter="handleSearchEnter"
                 type="text" 
                 placeholder="Pesquisar chamados, clientes ou artigos..." 
                 class="bg-transparent border-none outline-none text-sm w-full"
@@ -384,12 +385,20 @@ const handleSearchBlur = () => {
   }, 200)
 }
 
-const navigateTo = (route: string) => {
-  router.push(route)
-  isSearchFocused.value = false
-  searchQuery.value = ''
-  searchResults.value = []
-}
+const handleSearchEnter = () => {
+  if (searchResults.value.length > 0 && searchResults.value[0].route) {
+    navigateTo(searchResults.value[0].route);
+  }
+};
+
+const navigateTo = (routePath?: string) => {
+  if (routePath) {
+    router.push(routePath);
+  }
+  isSearchFocused.value = false;
+  searchQuery.value = '';
+  searchResults.value = [];
+};
 
 const toggleNotifications = () => {
   showNotifications.value = !showNotifications.value

@@ -21,5 +21,20 @@ services:
       - "6380:6379"
     restart: unless-stopped
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: deskflow_es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - deskflow_esdata:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
 volumes:
   deskflow_pgdata:
+  deskflow_esdata:
+

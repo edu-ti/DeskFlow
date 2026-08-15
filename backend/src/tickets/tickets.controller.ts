@@ -9,12 +9,16 @@ import { ChangeStateDto } from './dto/change-state.dto';
 import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { TransferTicketDto } from './dto/transfer-ticket.dto';
 import { TicketVisibilityGuard } from './guards/ticket-visibility.guard';
+import { SearchService } from '../search/search.service';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('tickets')
 export class TicketsController {
-  constructor(private readonly ticketService: TicketService) {}
+  constructor(
+    private readonly ticketService: TicketService,
+    private readonly searchService: SearchService
+  ) {}
 
   @Get()
   async getTickets(@Request() req: any) {
@@ -24,6 +28,13 @@ export class TicketsController {
   @Get('stats')
   async getStats() {
     return this.ticketService.getDashboardStats();
+  }
+
+  @Get('search')
+  async searchTickets(@Request() req: any) {
+    const q = req.query.q as string;
+    if (!q) return [];
+    return this.searchService.searchTickets(q);
   }
 
   @Get(':id')

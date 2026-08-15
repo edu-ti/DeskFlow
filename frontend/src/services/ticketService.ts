@@ -40,5 +40,10 @@ export const ticketService = {
   async getDashboardStats() {
     const response = await api.get('/tickets/stats')
     return response.data
+  },
+
+  async searchTickets(query: string) {
+    const response = await api.get(`/tickets/search`, { params: { q: query } })
+    return response.data
   }
 }

@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { SearchModule } from '../search/search.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { Ticket } from './entities/ticket.entity';
@@ -28,7 +29,8 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
     }),
     NotificationsModule,
     forwardRef(() => EmailModule),
-    forwardRef(() => WhatsappModule)
+    forwardRef(() => WhatsappModule),
+    SearchModule
   ],
   controllers: [TicketsController, CustomFieldsController, CsatController, SlaPoliciesController],
   providers: [TicketService, CustomFieldsService, SlaQueueConsumer, SlaPoliciesService],

@@ -1,17 +1,20 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ElasticsearchModule } from '@nestjs/elasticsearch';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SearchService } from './search.service';
-import { SearchController } from './search.controller';
-import { Ticket } from '../tickets/entities/ticket.entity';
-import { Article as KbArticle } from '../kb/entities/article.entity';
-import { User } from '../iam/entities/user.entity';
+import { SearchSyncListener } from './search-sync.listener';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Ticket, KbArticle, User]),
+    ElasticsearchModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        node: configService.get<string>('ELASTICSEARCH_NODE', 'http://localhost:9200'),
+      }),
+      inject: [ConfigService],
+    }),
   ],
-  controllers: [SearchController],
-  providers: [SearchService],
+  providers: [SearchService, SearchSyncListener],
   exports: [SearchService],
 })
 export class SearchModule {}

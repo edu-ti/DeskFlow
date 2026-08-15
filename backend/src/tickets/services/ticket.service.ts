@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Ticket } from '../entities/ticket.entity';
@@ -9,6 +9,7 @@ import { TicketHistory } from '../entities/ticket-history.entity';
 import { TicketLink } from '../entities/ticket-link.entity';
 import { TicketCustomFieldValue } from '../entities/ticket-custom-field-value.entity';
 import { TicketCreatedEvent } from '../events/ticket-created.event';
+import { User } from '../../iam/entities/user.entity';
 import { SLA_QUEUE_NAME, SlaJobData } from '../../sla/sla-queue.consumer';
 import { BusinessHoursUtil } from '../../sla/business-hours.util';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -83,37 +84,8 @@ export class TicketService {
       await this.customFieldValueRepository.save(fieldValues);
     }
 
-    // Agenda os Jobs do SLA de 1ª Resposta no BullMQ
-    if (savedTicket.firstResponseEscalationAt) {
-      const delayFull = savedTicket.firstResponseEscalationAt.getTime() - new Date().getTime();
-      const delayWarning = delayFull - (30 * 60 * 1000); // 30 minutos antes
-      
-      if (delayWarning > 0) {
-        await this.slaQueue.add('check-first-response-warning', {
-          ticketId: savedTicket.id,
-          escalationType: 'firstResponseWarning',
-        } as SlaJobData, { delay: delayWarning, removeOnComplete: true });
-      }
-      
-      if (delayFull > 0) {
-        await this.slaQueue.add('check-first-response', {
-          ticketId: savedTicket.id,
-          escalationType: 'firstResponse',
-        } as SlaJobData, { delay: delayFull, removeOnComplete: true });
-      }
-    }
-
-    // Agenda os Jobs de Solução no BullMQ
-    if (savedTicket.solutionEscalationAt) {
-      const delayFullSolution = savedTicket.solutionEscalationAt.getTime() - new Date().getTime();
-      
-      if (delayFullSolution > 0) {
-        await this.slaQueue.add('check-solution', {
-          ticketId: savedTicket.id,
-          escalationType: 'solution',
-        } as SlaJobData, { delay: delayFullSolution, removeOnComplete: true });
-      }
-    }
+    // Agenda os Jobs do SLA no BullMQ usando os IDs para poder remover depois
+    await this.scheduleSlaJobs(savedTicket);
 
     // Disparar evento de notificacao para Admins/Agents
     await this.notificationsService.notifyAdminsAndAgents(
@@ -141,7 +113,25 @@ export class TicketService {
 
   async findAll(user?: any): Promise<Ticket[]> {
     const isCustomerOnly = user?.roles?.length === 1 && user.roles.includes('customer');
-    const whereClause = isCustomerOnly ? { customer_id: user.id } : {};
+    const isAgent = user?.roles?.includes('agent') && !user?.roles?.includes('admin');
+    
+    let whereClause: any = {};
+
+    if (isCustomerOnly) {
+      whereClause = { customer_id: user.id };
+    } else if (isAgent) {
+      const dbUser = await this.ticketRepository.manager.findOne(User, {
+        where: { id: user.id },
+        relations: { groups: true }
+      });
+      const groupIds = dbUser?.groups?.map((g: any) => g.id) || [];
+      
+      if (groupIds.length > 0) {
+        whereClause = { group_id: In(groupIds) };
+      } else {
+        whereClause = { id: -1 }; // Impede acesso se o agente não tiver grupo
+      }
+    }
 
     return this.ticketRepository.find({
       where: whereClause,
@@ -322,10 +312,38 @@ export class TicketService {
         }
       }
 
+      // BR-MIGRAR-002: Lógica de Pausa de SLA
+      const isPauseState = (newStateId === 4 || newStateId === 6); // Pendente ou Dúvida
+      const wasPauseState = (oldState === 4 || oldState === 6);
+      
+      if (isPauseState && !wasPauseState) {
+        // Entrou em Pausa
+        if (!ticket.sla_paused_at) {
+          ticket.sla_paused_at = new Date();
+          await this.removeSlaJobs(ticket.id);
+        }
+      } else if (!isPauseState && wasPauseState) {
+        // Saiu da Pausa
+        if (ticket.sla_paused_at) {
+          const pausedMillis = new Date().getTime() - ticket.sla_paused_at.getTime();
+          if (ticket.firstResponseEscalationAt) {
+            ticket.firstResponseEscalationAt = new Date(ticket.firstResponseEscalationAt.getTime() + pausedMillis);
+          }
+          if (ticket.solutionEscalationAt) {
+            ticket.solutionEscalationAt = new Date(ticket.solutionEscalationAt.getTime() + pausedMillis);
+          }
+          ticket.sla_paused_at = null as any;
+          await this.scheduleSlaJobs(ticket);
+        }
+      }
+
+      if (newStateId === 5) {
+        // Removendo jobs de SLA ao fechar/resolver
+        await this.removeSlaJobs(ticket.id);
+      }
+
       await this.ticketRepository.save(ticket);
       await this.addHistory(ticketId, actorUserId, 'state_id', oldState?.toString(), newStateId.toString());
-      
-      // TODO: Recalcular SLA (BR-MIGRAR-002)
       
       this.eventEmitter.emit('ticket.updated', {
         ticket,
@@ -609,4 +627,53 @@ export class TicketService {
     await this.ticketRepository.save(ticket);
     return ticket;
   }
+
+  // --- Helper Methods para SLA (BR-MIGRAR-002) ---
+  private async removeSlaJobs(ticketId: number) {
+    try {
+      const frwJob = await this.slaQueue.getJob(`frw-${ticketId}`);
+      if (frwJob) await frwJob.remove();
+
+      const frJob = await this.slaQueue.getJob(`fr-${ticketId}`);
+      if (frJob) await frJob.remove();
+
+      const solJob = await this.slaQueue.getJob(`sol-${ticketId}`);
+      if (solJob) await solJob.remove();
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  private async scheduleSlaJobs(ticket: Ticket) {
+    await this.removeSlaJobs(ticket.id);
+    const now = new Date().getTime();
+
+    if (ticket.firstResponseEscalationAt) {
+      const delayFull = ticket.firstResponseEscalationAt.getTime() - now;
+      if (delayFull > 0) {
+        const delayWarning = delayFull - (30 * 60 * 1000); // 30 minutos antes
+        if (delayWarning > 0) {
+          await this.slaQueue.add('check-first-response-warning', 
+            { ticketId: ticket.id, escalationType: 'firstResponseWarning' } as SlaJobData, 
+            { delay: delayWarning, jobId: `frw-${ticket.id}`, removeOnComplete: true }
+          );
+        }
+        await this.slaQueue.add('check-first-response', 
+          { ticketId: ticket.id, escalationType: 'firstResponse' } as SlaJobData, 
+          { delay: delayFull, jobId: `fr-${ticket.id}`, removeOnComplete: true }
+        );
+      }
+    }
+
+    if (ticket.solutionEscalationAt) {
+      const delayFull = ticket.solutionEscalationAt.getTime() - now;
+      if (delayFull > 0) {
+        await this.slaQueue.add('check-solution', 
+          { ticketId: ticket.id, escalationType: 'solution' } as SlaJobData, 
+          { delay: delayFull, jobId: `sol-${ticket.id}`, removeOnComplete: true }
+        );
+      }
+    }
+  }
+
 }

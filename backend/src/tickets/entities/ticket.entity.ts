@@ -72,6 +72,9 @@ export class Ticket {
   @Column({ type: 'timestamp', nullable: true })
   solutionEscalationAt: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  sla_paused_at: Date | null;
+
   @Column({ default: false })
   isEscalated: boolean;
 
