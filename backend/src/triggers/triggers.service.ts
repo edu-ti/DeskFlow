@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import { Trigger } from './entities/trigger.entity';
 import { OnEvent } from '@nestjs/event-emitter';
 import { TicketService } from '../tickets/services/ticket.service';
+import { User } from '../iam/entities/user.entity';
+import { Ticket } from '../tickets/entities/ticket.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class TriggersService {
@@ -12,7 +15,12 @@ export class TriggersService {
   constructor(
     @InjectRepository(Trigger)
     private readonly triggerRepository: Repository<Trigger>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Ticket)
+    private readonly ticketRepository: Repository<Ticket>,
     private readonly ticketService: TicketService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(createTriggerDto: Partial<Trigger>): Promise<Trigger> {
@@ -43,8 +51,7 @@ export class TriggersService {
   }
 
   @OnEvent('ticket.updated')
-  async handleTicketUpdated(payload: { ticket: any, changedFields: any }) {
-    // Currently evaluate against the new state
+  async handleTicketUpdated(payload: { ticket: any; changedFields: any }) {
     await this.evaluateTriggers('ticket.updated', payload.ticket, payload.changedFields);
   }
 
@@ -56,7 +63,7 @@ export class TriggersService {
 
     for (const trigger of activeTriggers) {
       if (this.checkConditions(trigger.conditions, ticket, changedFields)) {
-        this.logger.log(`Executing Trigger #${trigger.id} - ${trigger.name} for Ticket #${ticket.id}`);
+        this.logger.log(`[TRIGGER MATCH] Executando Gatilho #${trigger.id} (${trigger.name}) no Chamado #${ticket.id}`);
         await this.executeActions(trigger.actions, ticket);
       }
     }
@@ -65,7 +72,6 @@ export class TriggersService {
   private checkConditions(conditions: any[], ticket: any, changedFields?: any): boolean {
     if (!conditions || conditions.length === 0) return true;
 
-    // For now, assume ALL conditions must pass (AND logic)
     for (const condition of conditions) {
       const { field, operator, value } = condition;
       const ticketValue = ticket[field];
@@ -107,23 +113,62 @@ export class TriggersService {
 
     for (const actionObj of actions) {
       const { action, value } = actionObj;
-      const actorUserId = 1; // System user ID
+      const actorUserId = 1; // Sistema
 
       try {
         switch (action) {
           case 'set_state':
             await this.ticketService.changeState(ticket.id, Number(value), actorUserId);
             break;
+
           case 'set_owner':
             await this.ticketService.assignTicket(ticket.id, Number(value), actorUserId);
             break;
+
           case 'set_group':
-            // we don't have changeGroup directly in ticketService yet. Let's assume updating directly.
-            // For now let's skip or add it to TicketService if needed.
+            await this.ticketService.changeGroup(ticket.id, Number(value), actorUserId);
             break;
+
           case 'set_priority':
-            // same here.
+            await this.ticketService.changePriority(ticket.id, Number(value), actorUserId);
             break;
+
+          case 'round_robin_assign': {
+            const targetGroupId = value ? Number(value) : ticket.group_id;
+            const agents = await this.userRepository.find({
+              where: { groups: { id: targetGroupId } },
+              relations: { groups: true }
+            });
+
+            if (agents.length > 0) {
+              let bestAgent = agents[0];
+              let minOpenTickets = Infinity;
+
+              for (const agent of agents) {
+                const count = await this.ticketRepository.count({
+                  where: { owner_id: agent.id, state_id: Not(5) }
+                });
+                if (count < minOpenTickets) {
+                  minOpenTickets = count;
+                  bestAgent = agent;
+                }
+              }
+
+              await this.ticketService.assignTicket(ticket.id, bestAgent.id, actorUserId);
+              this.logger.log(`[ROUND-ROBIN] Chamado #${ticket.id} balanceado para o agente ${bestAgent.firstname} ${bestAgent.lastname} (Fila atual: ${minOpenTickets})`);
+            }
+            break;
+          }
+
+          case 'send_notification':
+            await this.notificationsService.notifyAdminsAndAgents(
+              'Alerta de Automação (Trigger)',
+              value || `Gatilho de automação executado no chamado #${ticket.id}`,
+              'trigger_alert',
+              ticket.id
+            );
+            break;
+
           default:
             this.logger.warn(`Unknown action: ${action}`);
         }

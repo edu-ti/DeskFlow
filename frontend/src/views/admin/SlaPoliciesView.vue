@@ -1,211 +1,238 @@
 <template>
-  <div class="max-w-6xl mx-auto pb-8">
-    <div class="flex justify-between items-center mb-6">
+  <div class="max-w-7xl mx-auto space-y-6 pb-12">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-800">Políticas de SLA</h1>
-        <p class="text-sm text-gray-500 mt-1">Gerencie os Acordos de Nível de Serviço da sua operação.</p>
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-2xl font-bold text-gray-900">Políticas de SLA</h1>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+            Nível de Serviço
+          </span>
+        </div>
+        <p class="text-gray-500 text-sm mt-1">Configure os prazos máximos de primeira resposta e solução por grupo ou prioridade.</p>
       </div>
-      <button @click="openModal()" class="bg-df-primary hover:bg-df-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+      <button 
+        @click="openModal()" 
+        class="inline-flex items-center gap-2 bg-df-primary hover:bg-df-primary-hover text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm active:scale-95"
+      >
         <PlusIcon class="w-4 h-4" />
         Nova Política
       </button>
     </div>
 
     <!-- Lista de Políticas -->
-    <div class="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden">
-      <div v-if="isLoading" class="p-8 flex justify-center">
-        <Loader2Icon class="w-6 h-6 text-df-primary animate-spin" />
+    <div class="bg-white border border-gray-200/80 shadow-sm rounded-2xl overflow-hidden">
+      <div v-if="isLoading" class="p-12 flex flex-col items-center justify-center gap-3 text-gray-500">
+        <Loader2Icon class="w-8 h-8 text-df-primary animate-spin" />
+        <span class="text-sm font-medium">Carregando políticas de SLA...</span>
       </div>
       
-      <div v-else-if="policies.length === 0" class="p-8 text-center text-gray-500">
-        Nenhuma política de SLA configurada. Os chamados usarão o SLA padrão do sistema.
+      <div v-else-if="policies.length === 0" class="p-16 text-center text-gray-500 flex flex-col items-center justify-center">
+        <div class="p-4 bg-purple-50 text-purple-600 rounded-2xl mb-4">
+          <ClockIcon class="w-10 h-10" />
+        </div>
+        <h3 class="text-lg font-bold text-gray-900">Nenhuma política configurada</h3>
+        <p class="text-gray-500 text-sm mt-1.5 max-w-md">Crie políticas personalizadas de SLA para garantir que os prazos de atendimento aos clientes sejam cumpridos rigorosamente.</p>
+        <button 
+          @click="openModal()" 
+          class="mt-6 inline-flex items-center gap-2 bg-df-primary text-white font-medium px-4 py-2 rounded-xl text-sm hover:bg-df-primary-hover shadow-sm"
+        >
+          <PlusIcon class="w-4 h-4" />
+          Criar Primeira Política
+        </button>
       </div>
       
-      <table v-else class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridade</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grupo</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tempo 1ª Resposta</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tempo Solução</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="policy in policies" :key="policy.id" class="hover:bg-gray-50">
-            <td class="px-6 py-4 whitespace-nowrap">
-              <div class="text-sm font-medium text-gray-900">{{ policy.name }}</div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm text-gray-600">{{ getPriorityName(policy.priority_id) }}</span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm text-gray-600">{{ getGroupName(policy.group_id) }}</span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm font-medium text-gray-900">{{ formatMinutes(policy.first_response_mins) }}</span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span class="text-sm font-medium text-gray-900">{{ formatMinutes(policy.resolution_mins) }}</span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <span :class="policy.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
-                {{ policy.is_active ? 'Ativo' : 'Inativo' }}
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <button @click="openModal(policy)" class="text-df-primary hover:text-df-primary-hover mr-4">Editar</button>
-              <button @click="deletePolicy(policy.id)" class="text-red-600 hover:text-red-900">Excluir</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-gray-50/80 border-b border-gray-200/80 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th class="py-3.5 px-6">Nome da Política</th>
+              <th class="py-3.5 px-6">Prioridade</th>
+              <th class="py-3.5 px-6">Grupo / Setor</th>
+              <th class="py-3.5 px-6">1ª Resposta</th>
+              <th class="py-3.5 px-6">Resolução Final</th>
+              <th class="py-3.5 px-6">Status</th>
+              <th class="py-3.5 px-6 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr v-for="policy in policies" :key="policy.id" class="hover:bg-gray-50/80 transition-colors">
+              <td class="py-4 px-6">
+                <div class="font-bold text-gray-900">{{ policy.name }}</div>
+                <div class="text-xs text-gray-400">Horário comercial</div>
+              </td>
+              <td class="py-4 px-6">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold" :class="getPriorityBadge(policy.priority_id)">
+                  {{ getPriorityName(policy.priority_id) }}
+                </span>
+              </td>
+              <td class="py-4 px-6 text-sm text-gray-600 font-medium">
+                {{ getGroupName(policy.group_id) }}
+              </td>
+              <td class="py-4 px-6">
+                <span class="font-mono text-sm font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">
+                  {{ formatMinutes(policy.first_response_mins) }}
+                </span>
+              </td>
+              <td class="py-4 px-6">
+                <span class="font-mono text-sm font-semibold text-purple-600 bg-purple-50 px-2.5 py-1 rounded-lg">
+                  {{ formatMinutes(policy.resolution_mins) }}
+                </span>
+              </td>
+              <td class="py-4 px-6">
+                <span :class="[
+                  'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
+                  policy.is_active ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-200'
+                ]">
+                  <span class="w-1.5 h-1.5 rounded-full mr-1.5" :class="policy.is_active ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                  {{ policy.is_active ? 'Ativo' : 'Inativo' }}
+                </span>
+              </td>
+              <td class="py-4 px-6 text-right space-x-2">
+                <button @click="openModal(policy)" class="text-gray-600 hover:text-df-primary p-1.5 rounded-lg hover:bg-gray-100 transition-colors" title="Editar">
+                  <EditIcon class="w-4 h-4" />
+                </button>
+                <button @click="deletePolicy(policy.id)" class="text-gray-600 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors" title="Excluir">
+                  <TrashIcon class="w-4 h-4" />
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <!-- Modal de Criação/Edição -->
-    <div v-if="showModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-      <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" @click="closeModal"></div>
-        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-          <form @submit.prevent="savePolicy">
-            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-              <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="modal-title">
-                {{ form.id ? 'Editar Política de SLA' : 'Nova Política de SLA' }}
-              </h3>
-              
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700">Nome da Política</label>
-                  <input type="text" v-model="form.name" required class="mt-1 w-full border border-gray-300 rounded-lg p-2 focus:ring-df-primary focus:border-df-primary">
-                </div>
+    <!-- Modal de Criação / Edição -->
+    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-xs p-4 overflow-y-auto">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-gray-100 overflow-hidden flex flex-col my-8 animate-in fade-in zoom-in-95 duration-150">
+        <form @submit.prevent="savePolicy">
+          <!-- Header -->
+          <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div>
+              <h3 class="text-lg font-bold text-gray-900">{{ form.id ? 'Editar Política de SLA' : 'Nova Política de SLA' }}</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Defina os tempos limites em minutos para as etapas</p>
+            </div>
+            <button @click="closeModal" type="button" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100">
+              <XIcon class="w-5 h-5" />
+            </button>
+          </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700">Prioridade</label>
-                    <select v-model="form.priority_id" class="mt-1 w-full border border-gray-300 rounded-lg p-2 focus:ring-df-primary focus:border-df-primary">
-                      <option :value="null">Todas as Prioridades</option>
-                      <option :value="1">Baixa</option>
-                      <option :value="2">Normal</option>
-                      <option :value="3">Alta</option>
-                      <option :value="4">Urgente</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700">Grupo</label>
-                    <select v-model="form.group_id" class="mt-1 w-full border border-gray-300 rounded-lg p-2 focus:ring-df-primary focus:border-df-primary">
-                      <option :value="null">Todos os Grupos</option>
-                      <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
-                    </select>
-                  </div>
-                </div>
+          <!-- Body -->
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Nome da Política *</label>
+              <input v-model="form.name" type="text" required placeholder="Ex: SLA Padrão Suporte VIP" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+            </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700">Primeira Resposta (minutos)</label>
-                    <input type="number" min="1" v-model="form.first_response_mins" required class="mt-1 w-full border border-gray-300 rounded-lg p-2 focus:ring-df-primary focus:border-df-primary">
-                    <p class="text-xs text-gray-500 mt-1">{{ formatMinutes(form.first_response_mins) }}</p>
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700">Tempo de Solução (minutos)</label>
-                    <input type="number" min="1" v-model="form.resolution_mins" required class="mt-1 w-full border border-gray-300 rounded-lg p-2 focus:ring-df-primary focus:border-df-primary">
-                    <p class="text-xs text-gray-500 mt-1">{{ formatMinutes(form.resolution_mins) }}</p>
-                  </div>
-                </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Prioridade</label>
+                <select v-model="form.priority_id" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white">
+                  <option :value="null">Qualquer Prioridade</option>
+                  <option :value="1">1 - Baixa</option>
+                  <option :value="2">2 - Média</option>
+                  <option :value="3">3 - Alta</option>
+                  <option :value="4">4 - Urgente</option>
+                </select>
+              </div>
 
-                <div class="flex items-center">
-                  <input type="checkbox" v-model="form.is_active" id="isActive" class="h-4 w-4 text-df-primary focus:ring-df-primary border-gray-300 rounded">
-                  <label for="isActive" class="ml-2 block text-sm text-gray-900">Política Ativa</label>
-                </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Grupo / Setor</label>
+                <select v-model="form.group_id" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white">
+                  <option :value="null">Qualquer Grupo</option>
+                  <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
+                </select>
               </div>
             </div>
-            
-            <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-              <button type="submit" :disabled="isSaving" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-df-primary text-base font-medium text-white hover:bg-df-primary-hover focus:outline-none sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50">
-                <Loader2Icon v-if="isSaving" class="w-4 h-4 animate-spin mr-2" />
-                Salvar
-              </button>
-              <button type="button" @click="closeModal" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                Cancelar
-              </button>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">1ª Resposta (Minutos) *</label>
+                <input v-model.number="form.first_response_mins" type="number" required min="1" placeholder="Ex: 60 (1 hora)" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Resolução Final (Minutos) *</label>
+                <input v-model.number="form.resolution_mins" type="number" required min="1" placeholder="Ex: 1440 (24h)" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-mono">
+              </div>
             </div>
-          </form>
-        </div>
+
+            <div class="pt-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input v-model="form.is_active" type="checkbox" class="w-4 h-4 text-df-primary rounded border-gray-300 focus:ring-df-primary">
+                <span class="text-sm font-medium text-gray-700">Política ativa para novos chamados</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="p-4 border-t border-gray-100 flex justify-end gap-2.5 bg-gray-50">
+            <button @click="closeModal" type="button" class="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
+              Cancelar
+            </button>
+            <button type="submit" class="px-4 py-2 bg-df-primary text-white text-sm font-semibold rounded-xl hover:bg-df-primary-hover flex items-center gap-2 disabled:opacity-50" :disabled="isSaving">
+              <Loader2Icon v-if="isSaving" class="w-4 h-4 animate-spin" />
+              <span>Salvar Política</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Plus as PlusIcon, Loader2 as Loader2Icon } from 'lucide-vue-next'
-import api from '@/services/api'
-import { useToast } from '@/composables/useToast'
+import { ref, onMounted } from 'vue';
+import { PlusIcon, EditIcon, TrashIcon, ClockIcon, XIcon, Loader2Icon } from 'lucide-vue-next';
+import api from '@/services/api';
+import { useToast } from '@/composables/useToast';
 
-const { toastSuccess, toastError } = useToast()
+const { success: toastSuccess, error: toastError } = useToast();
 
-const policies = ref<any[]>([])
-const groups = ref<any[]>([])
-const isLoading = ref(true)
-const showModal = ref(false)
-const isSaving = ref(false)
+const policies = ref<any[]>([]);
+const groups = ref<any[]>([]);
+const isLoading = ref(true);
+const isSaving = ref(false);
+const showModal = ref(false);
 
-const form = ref({
-  id: null as number | null,
+const form = ref<any>({
+  id: null,
   name: '',
-  priority_id: null as number | null,
-  group_id: null as number | null,
+  priority_id: null,
+  group_id: null,
   first_response_mins: 60,
-  resolution_mins: 240,
-  is_active: true
-})
+  resolution_mins: 1440,
+  is_active: true,
+});
 
-const getPriorityName = (priorityId: number | null) => {
-  if (priorityId === null) return 'Qualquer'
-  const map: Record<number, string> = { 1: 'Baixa', 2: 'Normal', 3: 'Alta', 4: 'Urgente' }
-  return map[priorityId] || String(priorityId)
-}
+onMounted(async () => {
+  await Promise.all([loadPolicies(), loadGroups()]);
+});
 
-const getGroupName = (groupId: number | null) => {
-  if (groupId === null) return 'Qualquer'
-  const group = groups.value.find(g => g.id === groupId)
-  return group ? group.name : `Grupo #${groupId}`
-}
-
-const formatMinutes = (mins: number) => {
-  if (!mins) return '0h'
-  if (mins < 60) return `${mins}m`
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  return m === 0 ? `${h}h` : `${h}h ${m}m`
-}
-
-const fetchPolicies = async () => {
+const loadPolicies = async () => {
   try {
-    isLoading.value = true
-    const res = await api.get('/sla-policies')
-    policies.value = res.data
+    isLoading.value = true;
+    const res = await api.get('/sla-policies');
+    policies.value = res.data;
   } catch (error) {
-    console.error("Failed to load SLA policies", error)
+    toastError('Erro', 'Falha ao carregar políticas de SLA.');
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
-const fetchGroups = async () => {
+const loadGroups = async () => {
   try {
-    const res = await api.get('/groups')
-    groups.value = res.data
+    const res = await api.get('/groups');
+    groups.value = res.data;
   } catch (error) {
-    console.error("Failed to load groups", error)
+    console.error('Falha ao carregar grupos', error);
   }
-}
+};
 
 const openModal = (policy?: any) => {
   if (policy) {
-    form.value = { ...policy }
+    form.value = { ...policy };
   } else {
     form.value = {
       id: null,
@@ -213,55 +240,80 @@ const openModal = (policy?: any) => {
       priority_id: null,
       group_id: null,
       first_response_mins: 60,
-      resolution_mins: 240,
-      is_active: true
-    }
+      resolution_mins: 1440,
+      is_active: true,
+    };
   }
-  showModal.value = true
-}
+  showModal.value = true;
+};
 
 const closeModal = () => {
-  showModal.value = false
-}
+  showModal.value = false;
+};
 
 const savePolicy = async () => {
   try {
-    isSaving.value = true
-    const payload = {
-      ...form.value,
-      priority_id: form.value.priority_id || null,
-      group_id: form.value.group_id || null
-    }
-
+    isSaving.value = true;
     if (form.value.id) {
-      await api.put(`/sla-policies/${form.value.id}`, payload)
-      toastSuccess('Sucesso', 'Política de SLA atualizada.')
+      await api.put(`/sla-policies/${form.value.id}`, form.value);
+      toastSuccess('Sucesso', 'Política de SLA atualizada com sucesso.');
     } else {
-      await api.post('/sla-policies', payload)
-      toastSuccess('Sucesso', 'Política de SLA criada.')
+      await api.post('/sla-policies', form.value);
+      toastSuccess('Sucesso', 'Política de SLA criada com sucesso.');
     }
-    closeModal()
-    await fetchPolicies()
+    await loadPolicies();
+    closeModal();
   } catch (error) {
-    console.error("Error saving policy", error)
+    toastError('Erro', 'Falha ao salvar política de SLA.');
   } finally {
-    isSaving.value = false
+    isSaving.value = false;
   }
-}
+};
 
 const deletePolicy = async (id: number) => {
-  if (!confirm('Tem certeza que deseja excluir esta política de SLA?')) return
-  try {
-    await api.delete(`/sla-policies/${id}`)
-    toastSuccess('Sucesso', 'Política excluída.')
-    await fetchPolicies()
-  } catch (error) {
-    console.error("Error deleting policy", error)
+  if (confirm('Deseja realmente excluir esta política de SLA?')) {
+    try {
+      await api.delete(`/sla-policies/${id}`);
+      toastSuccess('Sucesso', 'Política de SLA excluída com sucesso.');
+      await loadPolicies();
+    } catch (error) {
+      toastError('Erro', 'Falha ao excluir política de SLA.');
+    }
   }
-}
+};
 
-onMounted(() => {
-  fetchGroups()
-  fetchPolicies()
-})
+const getPriorityName = (id: number | null) => {
+  switch (id) {
+    case 1: return 'Baixa';
+    case 2: return 'Média';
+    case 3: return 'Alta';
+    case 4: return 'Urgente';
+    default: return 'Todas';
+  }
+};
+
+const getPriorityBadge = (id: number | null) => {
+  switch (id) {
+    case 1: return 'bg-gray-100 text-gray-700';
+    case 2: return 'bg-blue-100 text-blue-800';
+    case 3: return 'bg-amber-100 text-amber-800';
+    case 4: return 'bg-red-100 text-red-800';
+    default: return 'bg-slate-100 text-slate-700';
+  }
+};
+
+const getGroupName = (id: number | null) => {
+  if (!id) return 'Todos os Grupos';
+  const g = groups.value.find(group => group.id === id);
+  return g ? g.name : `Grupo #${id}`;
+};
+
+const formatMinutes = (mins: number) => {
+  if (!mins) return 'N/A';
+  if (mins < 60) return `${mins} min`;
+  const hours = mins / 60;
+  if (hours < 24) return `${hours}h`;
+  const days = (hours / 24).toFixed(1).replace('.0', '');
+  return `${days}d (${hours}h)`;
+};
 </script>

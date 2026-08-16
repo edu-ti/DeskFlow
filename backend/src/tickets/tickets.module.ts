@@ -16,6 +16,7 @@ import { CsatController } from './controllers/csat.controller';
 import { SLA_QUEUE_NAME, SlaQueueConsumer } from '../sla/sla-queue.consumer';
 import { SlaPolicy } from '../sla/entities/sla-policy.entity';
 import { SlaPoliciesService } from '../sla/services/sla-policies.service';
+import { SlaWatchdogService } from '../sla/services/sla-watchdog.service';
 import { SlaPoliciesController } from '../sla/controllers/sla-policies.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EmailModule } from '../email/email.module';
@@ -33,7 +34,7 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
     SearchModule
   ],
   controllers: [TicketsController, CustomFieldsController, CsatController, SlaPoliciesController],
-  providers: [TicketService, CustomFieldsService, SlaQueueConsumer, SlaPoliciesService],
+  providers: [TicketService, CustomFieldsService, SlaQueueConsumer, SlaPoliciesService, SlaWatchdogService],
   exports: [TicketService, TypeOrmModule],
 })
 export class TicketsModule {}

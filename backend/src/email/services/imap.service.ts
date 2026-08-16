@@ -25,8 +25,7 @@ export class ImapService {
     const imapUser = (await this.settingsService.getSetting('IMAP_USER')) || this.configService.get('IMAP_USER');
     const imapPass = (await this.settingsService.getSetting('IMAP_PASS')) || this.configService.get('IMAP_PASS');
 
-    if (!imapHost || !imapUser || !imapPass) {
-      this.logger.warn('IMAP_HOST, IMAP_USER ou IMAP_PASS not configured in DB or .env, skipping IMAP fetch');
+    if (!imapHost || !imapUser || !imapPass || imapHost === 'imap.example.com') {
       return;
     }
 
@@ -66,7 +65,11 @@ export class ImapService {
     } catch (error) {
       this.logger.error('Error fetching emails', error);
     } finally {
-      await client.logout();
+      try {
+        if (client.usable) {
+          await client.logout();
+        }
+      } catch (_) {}
     }
   }
 }

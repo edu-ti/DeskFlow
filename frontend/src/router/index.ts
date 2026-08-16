@@ -140,6 +140,12 @@ const router = createRouter({
           name: 'admin-sla-policies',
           component: () => import('../views/admin/SlaPoliciesView.vue'),
           meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/audit',
+          name: 'admin-audit',
+          component: () => import('../views/admin/AuditLogsView.vue'),
+          meta: { requiresAdmin: true }
         }
       ]
     },

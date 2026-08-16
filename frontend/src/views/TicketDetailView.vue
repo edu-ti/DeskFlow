@@ -210,8 +210,51 @@
         </div>
       </div>
 
+
+      <!-- AI Assistant Summary Box (if generated) -->
+      <div v-if="aiSummary" class="mx-4 mt-3 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200/80 rounded-2xl shadow-xs animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2 text-purple-900 font-bold text-xs">
+            <SparklesIcon class="w-4 h-4 text-purple-600" />
+            <span>Resumo Executivo da IA</span>
+          </div>
+          <button @click="aiSummary = ''" class="text-purple-400 hover:text-purple-700 p-1 rounded-lg">
+            <XIcon class="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div class="text-xs text-purple-950 leading-relaxed whitespace-pre-wrap">
+          {{ aiSummary }}
+        </div>
+      </div>
+
+      <!-- Reply Box Toolbar with AI Buttons -->
+      <div class="px-4 pt-3 pb-1 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <button 
+            @click="generateAiSummary" 
+            type="button" 
+            :disabled="isGeneratingSummary"
+            class="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+          >
+            <Loader2Icon v-if="isGeneratingSummary" class="w-3 h-3 animate-spin text-purple-600" />
+            <SparklesIcon v-else class="w-3 h-3 text-purple-600" />
+            <span>Resumir com IA</span>
+          </button>
+
+          <button 
+            @click="generateAiSuggestion" 
+            type="button" 
+            :disabled="isGeneratingSuggestion"
+            class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+          >
+            <Loader2Icon v-if="isGeneratingSuggestion" class="w-3 h-3 animate-spin text-blue-600" />
+            <SparklesIcon v-else class="w-3 h-3 text-blue-600" />
+            <span>Sugerir Resposta IA</span>
+          </button>
+        </div>
+      </div>
       <!-- Reply Box -->
-      <div class="p-4 border-t border-gray-200 bg-gray-50">
+      <div class="p-4 pt-2 bg-gray-50">
         <form @submit.prevent="handleReply" class="relative">
           <textarea 
             v-model="replyText"
@@ -245,7 +288,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Loader2 as Loader2Icon, MessageSquare as MessageSquareIcon, Send as SendIcon, User as UserIcon, Lock as LockIcon, Activity as ActivityIcon, X as XIcon, Play as PlayIcon, ChevronDown as ChevronDownIcon, Clock as ClockIcon, AlertCircle as AlertCircleIcon } from 'lucide-vue-next'
+import { Loader2 as Loader2Icon, MessageSquare as MessageSquareIcon, Send as SendIcon, User as UserIcon, Lock as LockIcon, Activity as ActivityIcon, X as XIcon, Play as PlayIcon, ChevronDown as ChevronDownIcon, Clock as ClockIcon, AlertCircle as AlertCircleIcon, Sparkles as SparklesIcon } from 'lucide-vue-next'
 import { ticketService } from '../services/ticketService'
 import { iamService } from '../services/iamService'
 import api from '../services/api'

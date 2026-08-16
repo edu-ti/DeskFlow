@@ -4,7 +4,17 @@
     <div class="w-1/2 max-w-[700px] min-w-[550px] flex-shrink-0 border-r border-gray-200 flex flex-col h-full bg-gray-50">
       <!-- Tabs -->
       <div class="px-4 py-3 border-b border-gray-200 bg-white">
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">WhatsApp (Omnichannel)</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold text-gray-800">WhatsApp (Omnichannel)</h2>
+          <button 
+            @click="showSimulateModal = true" 
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors shadow-sm active:scale-95"
+            title="Simular mensagem recebida pelo WhatsApp"
+          >
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Simular Mensagem
+          </button>
+        </div>
         <div class="flex space-x-1 overflow-x-auto pb-1 scrollbar-hide">
           <button 
             v-for="tab in tabs" 
@@ -196,6 +206,52 @@
               </div>
             </div>
           </template>
+        </div>
+
+
+        <!-- AI Assistant Action Bar -->
+        <div v-if="selectedTicket" class="px-4 py-2 bg-gradient-to-r from-purple-50/70 to-indigo-50/70 border-t border-purple-100 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <button 
+              @click="generateAiSummary" 
+              type="button" 
+              :disabled="isGeneratingSummary"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-semibold transition-all shadow-2xs disabled:opacity-50"
+            >
+              <Loader2Icon v-if="isGeneratingSummary" class="w-3.5 h-3.5 animate-spin text-purple-600" />
+              <SparklesIcon v-else class="w-3.5 h-3.5 text-purple-600" />
+              <span>Resumo IA</span>
+            </button>
+
+            <button 
+              @click="generateAiSuggestion" 
+              type="button" 
+              :disabled="isGeneratingSuggestion"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition-all shadow-2xs disabled:opacity-50"
+            >
+              <Loader2Icon v-if="isGeneratingSuggestion" class="w-3.5 h-3.5 animate-spin text-blue-600" />
+              <SparklesIcon v-else class="w-3.5 h-3.5 text-blue-600" />
+              <span>Sugerir Resposta IA</span>
+            </button>
+          </div>
+
+          <span v-if="selectedTicket" class="text-[11px] text-purple-800/80 font-medium">Assistente DeskFlow AI</span>
+        </div>
+
+        <!-- AI Summary Floating Card (if active) -->
+        <div v-if="aiSummary" class="mx-4 my-2 p-3.5 bg-white border border-purple-200 rounded-xl shadow-sm animate-in fade-in zoom-in-95 duration-150">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-1.5 text-purple-900 font-bold text-xs">
+              <SparklesIcon class="w-3.5 h-3.5 text-purple-600" />
+              <span>Resumo da Conversa</span>
+            </div>
+            <button @click="aiSummary = ''" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg">
+              <XIcon class="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div class="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
+            {{ aiSummary }}
+          </div>
         </div>
 
         <!-- Chat Input -->
@@ -532,6 +588,75 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal: Simular Mensagem WhatsApp -->
+    <div v-if="showSimulateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-xs">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-sm">
+              WA
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-gray-900 leading-tight">Simulador de WhatsApp</h3>
+              <p class="text-xs text-gray-500">Envie uma mensagem fictícia para testar o fluxo</p>
+            </div>
+          </div>
+          <button @click="showSimulateModal = false" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+            <XIcon class="w-5 h-5" />
+          </button>
+        </div>
+
+        <div class="space-y-4 my-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Nome do Cliente</label>
+            <input 
+              v-model="simName" 
+              type="text" 
+              placeholder="Ex: Carlos Eduardo" 
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Número de Telefone</label>
+            <input 
+              v-model="simPhone" 
+              type="text" 
+              placeholder="5511999998888" 
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none font-mono"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Mensagem Inicial</label>
+            <textarea 
+              v-model="simMessage" 
+              rows="3"
+              placeholder="Digite a mensagem do cliente..." 
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none resize-none"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+          <button 
+            @click="showSimulateModal = false" 
+            class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+          >
+            Cancelar
+          </button>
+          <button 
+            @click="simulateWhatsAppMessage" 
+            :disabled="isSimulating || !simMessage.trim()" 
+            class="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50 shadow-sm"
+          >
+            <Loader2Icon v-if="isSimulating" class="w-4 h-4 animate-spin" />
+            <span>{{ isSimulating ? 'Processando...' : 'Enviar Simulação' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -549,6 +674,37 @@ const backendUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.r
 
 const router = useRouter()
 const { success: toastSuccess, error: toastError } = useToast()
+
+const aiSummary = ref('')
+const isGeneratingSummary = ref(false)
+const isGeneratingSuggestion = ref(false)
+
+const generateAiSummary = async () => {
+  if (!selectedTicket.value) return
+  isGeneratingSummary.value = true
+  try {
+    const res = await api.post(`/ai/tickets/${selectedTicket.value.id}/summarize`)
+    aiSummary.value = res.data.summary
+  } catch (err) {
+    toastError('Erro', 'Não foi possível gerar o resumo com IA.')
+  } finally {
+    isGeneratingSummary.value = false
+  }
+}
+
+const generateAiSuggestion = async () => {
+  if (!selectedTicket.value) return
+  isGeneratingSuggestion.value = true
+  try {
+    const res = await api.post(`/ai/tickets/${selectedTicket.value.id}/suggest-reply`)
+    newMessage.value = res.data.suggestion
+  } catch (err) {
+    toastError('Erro', 'Não foi possível sugerir resposta com IA.')
+  } finally {
+    isGeneratingSuggestion.value = false
+  }
+}
+
 
 const tabs = [
   { id: 1, label: 'Triagem' },
@@ -586,6 +742,35 @@ const isMerging = ref(false)
 const showLinkModal = ref(false)
 const linkTargetId = ref('')
 const isLinking = ref(false)
+
+// Simulator state
+const showSimulateModal = ref(false)
+const simName = ref('Carlos Cliente')
+const simPhone = ref('5511988887777')
+const simMessage = ref('Olá! Gostaria de consultar o andamento da minha solicitação.')
+const isSimulating = ref(false)
+
+const simulateWhatsAppMessage = async () => {
+  if (!simMessage.value.trim()) return
+  isSimulating.value = true
+  try {
+    await api.post('/whatsapp/simulate', {
+      from: simPhone.value.trim() || '5511988887777',
+      name: simName.value.trim() || 'Cliente WhatsApp',
+      text: simMessage.value.trim()
+    })
+    toastSuccess('Sucesso', 'Mensagem de WhatsApp simulada com sucesso!')
+    showSimulateModal.value = false
+    simMessage.value = ''
+    await fetchTickets()
+    activeTab.value = 1 // Muda para aba Triagem onde novos chamados entram
+  } catch (error) {
+    toastError('Erro', 'Falha ao simular mensagem de WhatsApp.')
+  } finally {
+    isSimulating.value = false
+  }
+}
+
 const ticketLinks = ref<any[]>([])
 
 const showSubticketModal = ref(false)

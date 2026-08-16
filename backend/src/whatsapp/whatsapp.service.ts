@@ -7,6 +7,7 @@ import { User } from '../iam/entities/user.entity';
 import { Role } from '../iam/entities/role.entity';
 import { TicketService } from '../tickets/services/ticket.service';
 import { SettingsService } from '../settings/services/settings.service';
+import { AiService } from '../ai/ai.service';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,6 +25,8 @@ export class WhatsappService {
     private readonly ticketService: TicketService,
     private readonly settingsService: SettingsService,
     private readonly httpService: HttpService,
+    @Inject(forwardRef(() => AiService))
+    private readonly aiService: AiService,
   ) {}
 
   async handleIncomingMessage(fromPhone: string, profileName: string, text: string, phoneNumberId: string, media?: any) {
@@ -87,7 +90,26 @@ export class WhatsappService {
         source: 'whatsapp'
       };
       
-      await this.ticketService.createTicket(ticketData, text, [], attachments);
+      const created = await this.ticketService.createTicket(ticketData, text, [], attachments);
+
+      // Triagem Inteligente via IA / Base de Conhecimento
+      try {
+        const triage = await this.aiService.triageWhatsAppMessage(fromPhone, profileName, text);
+        if (triage && triage.replyText) {
+          await this.sendMessage(fromPhone, triage.replyText);
+          if (created && created.id) {
+            await this.ticketService.addArticle(
+              created.id,
+              `🤖 **Resposta Automática da IA:**\n${triage.replyText}`,
+              'whatsapp',
+              true,
+              1
+            );
+          }
+        }
+      } catch (err) {
+        this.logger.error('Erro na triagem de IA para WhatsApp', err);
+      }
     }
   }
 

@@ -34,6 +34,9 @@ import { SettingsModule } from './settings/settings.module';
 import { Setting } from './settings/entities/setting.entity';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { SlaPolicy } from './sla/entities/sla-policy.entity';
+import { AiModule } from './ai/ai.module';
+import { AuditLog } from './audit/entities/audit-log.entity';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -48,7 +51,7 @@ import { SlaPolicy } from './sla/entities/sla-policy.entity';
         username: configService.get<string>('DB_USER', 'deskflow'),
         password: configService.get<string>('DB_PASS', 'deskflow_password'),
         database: configService.get<string>('DB_NAME', 'deskflow_db'),
-        entities: [User, Group, Role, Ticket, Article, TicketHistory, TicketLink, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle, Macro, Trigger, Setting, SlaPolicy],
+        entities: [User, Group, Role, Ticket, Article, TicketHistory, TicketLink, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle, Macro, Trigger, Setting, SlaPolicy, AuditLog],
         synchronize: true, // APENAS PARA DESENVOLVIMENTO: cria tabelas automaticamente
       }),
     }),
@@ -74,6 +77,8 @@ import { SlaPolicy } from './sla/entities/sla-policy.entity';
     SettingsModule,
     AnalyticsModule,
     WhatsappModule,
+    AiModule,
+    AuditModule,
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot()
   ],

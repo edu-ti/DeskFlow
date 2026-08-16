@@ -30,6 +30,17 @@ export class WhatsappController {
     }
   }
 
+  @Post('simulate')
+  async simulateIncomingMessage(@Body() body: { from?: string; name?: string; text?: string; phone_number_id?: string }) {
+    const from = body.from || '5511999998888';
+    const name = body.name || 'Cliente Teste WhatsApp';
+    const text = body.text || 'Olá! Gostaria de tirar uma dúvida pelo WhatsApp.';
+    const phoneNumberId = body.phone_number_id || 'test_phone_number_id';
+
+    await this.whatsappService.handleIncomingMessage(from, name, text, phoneNumberId);
+    return { success: true, message: 'Simulated WhatsApp message processed successfully', data: { from, name, text } };
+  }
+
   @Post('webhook')
   async handleWebhook(@Body() body: any, @Res() res: Response) {
     try {

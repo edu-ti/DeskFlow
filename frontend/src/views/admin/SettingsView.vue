@@ -142,13 +142,50 @@
         </div>
       </div>
 
+
+      <!-- AI Settings -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-purple-50/50 flex items-center gap-3">
+          <SparklesIcon class="w-5 h-5 text-purple-600" />
+          <h2 class="font-medium text-gray-900">Inteligência Artificial & Chatbot</h2>
+        </div>
+        <div class="p-6 space-y-4">
+          <p class="text-sm text-gray-500 mb-4">
+            Parâmetros do assistente de IA para geração de resumos, sugestões de respostas e triagem automática no WhatsApp.
+          </p>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">OpenAI API Key (ou Provedor Compatível)</label>
+            <input v-model="settings.OPENAI_API_KEY" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="sk-proj-••••••••">
+            <span class="text-[11px] text-gray-400 mt-1 block">Deixe em branco para utilizar o motor heurístico inteligente local nativo.</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Modelo de IA</label>
+              <select v-model="settings.AI_MODEL" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-white">
+                <option value="gpt-4o-mini">gpt-4o-mini (Recomendado)</option>
+                <option value="gpt-4o">gpt-4o (Avançado)</option>
+                <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Chatbot no WhatsApp</label>
+              <select v-model="settings.AI_BOT_ENABLED" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none bg-white">
+                <option value="true">Ativado (Auto-resposta e Triagem)</option>
+                <option value="false">Desativado (Apenas humano)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Save as SaveIcon, Loader2 as Loader2Icon, Inbox as InboxIcon, Send as SendIcon } from 'lucide-vue-next'
+import { Save as SaveIcon, Loader2 as Loader2Icon, Inbox as InboxIcon, Send as SendIcon, Sparkles as SparklesIcon } from 'lucide-vue-next'
 import api from '@/services/api'
 import { useToast } from '@/composables/useToast'
 
@@ -171,7 +208,10 @@ const settings = ref<Record<string, string>>({
   SMTP_PASS: '',
   whatsapp_token: '',
   whatsapp_phone_id: '',
-  whatsapp_verify_token: 'deskflow_whatsapp_2026'
+  whatsapp_verify_token: 'deskflow_whatsapp_2026',
+  OPENAI_API_KEY: '',
+  AI_MODEL: 'gpt-4o-mini',
+  AI_BOT_ENABLED: 'true'
 })
 
 onMounted(async () => {
