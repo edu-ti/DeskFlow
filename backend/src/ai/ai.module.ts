@@ -1,1 +1,20 @@
-import { Module } from '@nestjs/common';\nimport { TypeOrmModule } from '@nestjs/typeorm';\nimport { AiService } from './ai.service';\nimport { AiController } from './ai.controller';\nimport { Ticket } from '../tickets/entities/ticket.entity';\nimport { Article } from '../tickets/entities/article.entity';\nimport { SettingsModule } from '../settings/settings.module';\nimport { KbModule } from '../kb/kb.module';\n\n@Module({\n  imports: [\n    TypeOrmModule.forFeature([Ticket, Article]),\n    SettingsModule,\n    KbModule,\n  ],\n  controllers: [AiController],\n  providers: [AiService],\n  exports: [AiService],\n})\nexport class AiModule {}
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AiService } from './ai.service';
+import { AiController } from './ai.controller';
+import { Ticket } from '../tickets/entities/ticket.entity';
+import { Article } from '../tickets/entities/article.entity';
+import { SettingsModule } from '../settings/settings.module';
+import { KbModule } from '../kb/kb.module';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([Ticket, Article]),
+    SettingsModule,
+    KbModule,
+  ],
+  controllers: [AiController],
+  providers: [AiService],
+  exports: [AiService],
+})
+export class AiModule {}

@@ -88,6 +88,11 @@ const router = createRouter({
           component: () => import('../views/kb/ArticleDetailView.vue'),
         },
         {
+          path: 'contacts',
+          name: 'contacts',
+          component: () => import('../views/ContactsView.vue'),
+        },
+        {
           path: 'admin/users',
           name: 'admin-users',
           component: () => import('../views/admin/UsersView.vue'),
@@ -97,6 +102,30 @@ const router = createRouter({
           path: 'admin/groups',
           name: 'admin-groups',
           component: () => import('../views/admin/GroupsView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/organizations',
+          name: 'admin-organizations',
+          component: () => import('../views/admin/OrganizationsView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/tags',
+          name: 'admin-tags',
+          component: () => import('../views/admin/TagsView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/overviews',
+          name: 'admin-overviews',
+          component: () => import('../views/admin/OverviewsView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/text-modules',
+          name: 'admin-text-modules',
+          component: () => import('../views/admin/TextModulesView.vue'),
           meta: { requiresAdmin: true }
         },
         {

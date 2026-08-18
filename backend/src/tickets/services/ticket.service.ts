@@ -453,9 +453,9 @@ export class TicketService {
       const slaPolicy = await this.slaPoliciesService.getMatchingPolicy(priorityId, ticket.group_id);
       if (slaPolicy && slaPolicy.is_active) {
         if (!ticket.firstResponseEscalationAt || ticket.state_id === 1) {
-          ticket.firstResponseEscalationAt = BusinessHoursUtil.calculateEscalationDate(ticket.created_at, slaPolicy.first_response_mins);
+          ticket.firstResponseEscalationAt = BusinessHoursUtil.addMinutes(ticket.created_at, slaPolicy.first_response_mins);
         }
-        ticket.solutionEscalationAt = BusinessHoursUtil.calculateEscalationDate(ticket.created_at, slaPolicy.resolution_mins);
+        ticket.solutionEscalationAt = BusinessHoursUtil.addMinutes(ticket.created_at, slaPolicy.resolution_mins);
         await this.removeSlaJobs(ticket.id);
         await this.scheduleSlaJobs(ticket);
       }
@@ -478,51 +478,6 @@ export class TicketService {
     await this.ticketRepository.softDelete(ticketId);
   }
 
-
-  async getTicketByCsatToken(token: string): Promise<Ticket> {
-    const ticket = await this.ticketRepository.findOne({
-      where: { csat_token: token },
-      relations: { owner: true, customer: true }
-    });
-    if (!ticket) {
-      throw new NotFoundException('Pesquisa de satisfação não encontrada ou token inválido');
-    }
-    return ticket;
-  }
-
-  async submitCsat(token: string, score: number, comment?: string): Promise<Ticket> {
-    const ticket = await this.getTicketByCsatToken(token);
-    ticket.satisfaction_score = score;
-    if (comment) {
-      ticket.satisfaction_comment = comment;
-    }
-    
-    await this.ticketRepository.save(ticket);
-
-    // Registra nota interna com a avaliação do cliente
-    await this.addArticle(
-      ticket.id,
-      `**Pesquisa de Satisfação (CSAT) Respondida**\n\n⭐ **Nota:** ${score} / 5 estrelas${comment ? `\n💬 **Comentário:** ${comment}` : ''}`,
-      'note',
-      true, // is_internal
-      ticket.customer_id || 1
-    );
-
-    // Notificar atendente
-    if (ticket.owner_id) {
-      await this.notificationsService.createNotification(
-        ticket.owner_id,
-        'Nova Avaliação CSAT',
-        `O cliente avaliou o chamado #${ticket.id} com nota ${score}/5 ⭐`,
-        'csat_received',
-        ticket.id
-      );
-    }
-
-    this.eventEmitter.emit('csat.submitted', { ticket, score, comment });
-
-    return ticket;
-  }
 
   async changeTitle(ticketId: number, newTitle: string, actorUserId: number): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });

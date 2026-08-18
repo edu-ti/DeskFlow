@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, ManyToMany, ManyToOne, JoinColumn, JoinTable } from 'typeorm';
 import { Role } from './role.entity';
 import { Group } from './group.entity';
+import { Organization } from '../../organizations/entities/organization.entity';
 
 @Entity('users')
 export class User {
@@ -22,6 +23,18 @@ export class User {
   @Column({ nullable: true, unique: true })
   phone: string;
 
+  @Column({ nullable: true })
+  job_title: string;
+
+  @Column({ nullable: true })
+  department: string;
+
+  @Column({ nullable: true })
+  unit: string;
+
+  @Column({ default: true })
+  is_active: boolean;
+
   @Column()
   password_hash: string;
 
@@ -41,4 +54,11 @@ export class User {
   @ManyToMany(() => Group, { cascade: true })
   @JoinTable({ name: 'user_groups' })
   groups: Group[];
+
+  @Column({ name: 'organization_id', nullable: true })
+  organization_id: number;
+
+  @ManyToOne(() => Organization, (organization) => organization.members)
+  @JoinColumn({ name: 'organization_id' })
+  organization: Organization;
 }

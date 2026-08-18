@@ -57,10 +57,16 @@
           <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Base de Conhecimento</span>
         </router-link>
         
-        <a href="#" class="flex items-center py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors group" :class="isSidebarCollapsed ? 'justify-center px-0' : 'px-3'" title="Clientes">
+        <router-link 
+          to="/contacts" 
+          class="flex items-center py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors group"
+          :class="isSidebarCollapsed ? 'justify-center px-0' : 'px-3'"
+          active-class="bg-df-primary text-white hover:text-white hover:bg-df-primary"
+          title="Contatos"
+        >
           <UsersIcon class="w-5 h-5 flex-shrink-0" :class="isSidebarCollapsed ? 'mr-0' : 'mr-3'" />
-          <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Clientes</span>
-        </a>
+          <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Contatos</span>
+        </router-link>
 
         <template v-if="isAdmin">
           <div class="pt-6 pb-2" :class="isSidebarCollapsed ? 'px-0 text-center' : 'px-3'">
@@ -88,6 +94,50 @@
           >
             <FolderKeyIcon class="w-5 h-5 flex-shrink-0" :class="isSidebarCollapsed ? 'mr-0' : 'mr-3'" />
             <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Grupos</span>
+          </router-link>
+
+          <router-link 
+            to="/admin/organizations" 
+            class="flex items-center py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors group"
+            :class="isSidebarCollapsed ? 'justify-center px-0' : 'px-3'"
+            active-class="bg-df-primary text-white hover:text-white hover:bg-df-primary"
+            title="Organizações"
+          >
+            <Building2Icon class="w-5 h-5 flex-shrink-0" :class="isSidebarCollapsed ? 'mr-0' : 'mr-3'" />
+            <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Organizações</span>
+          </router-link>
+
+          <router-link 
+            to="/admin/tags" 
+            class="flex items-center py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors group"
+            :class="isSidebarCollapsed ? 'justify-center px-0' : 'px-3'"
+            active-class="bg-df-primary text-white hover:text-white hover:bg-df-primary"
+            title="Etiquetas"
+          >
+            <TagIcon class="w-5 h-5 flex-shrink-0" :class="isSidebarCollapsed ? 'mr-0' : 'mr-3'" />
+            <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Etiquetas</span>
+          </router-link>
+
+          <router-link 
+            to="/admin/overviews" 
+            class="flex items-center py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors group"
+            :class="isSidebarCollapsed ? 'justify-center px-0' : 'px-3'"
+            active-class="bg-df-primary text-white hover:text-white hover:bg-df-primary"
+            title="Visões"
+          >
+            <LayersIcon class="w-5 h-5 flex-shrink-0" :class="isSidebarCollapsed ? 'mr-0' : 'mr-3'" />
+            <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Visões</span>
+          </router-link>
+
+          <router-link 
+            to="/admin/text-modules" 
+            class="flex items-center py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors group"
+            :class="isSidebarCollapsed ? 'justify-center px-0' : 'px-3'"
+            active-class="bg-df-primary text-white hover:text-white hover:bg-df-primary"
+            title="Respostas Prontas"
+          >
+            <FileTextIcon class="w-5 h-5 flex-shrink-0" :class="isSidebarCollapsed ? 'mr-0' : 'mr-3'" />
+            <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Respostas Prontas</span>
           </router-link>
           
           <router-link 
@@ -312,7 +362,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon, LayoutDashboard as LayoutDashboardIcon, Shield as ShieldIcon, FolderKey as FolderKeyIcon, Settings as SettingsIcon, BookOpen as BookOpenIcon, Play as PlayIcon, Menu as MenuIcon, Zap as ZapIcon, Loader2 as Loader2Icon, BarChart2 as BarChart2Icon, Clock as ClockIcon, ShieldAlert as ShieldAlertIcon } from 'lucide-vue-next'
+import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon, LayoutDashboard as LayoutDashboardIcon, Shield as ShieldIcon, FolderKey as FolderKeyIcon, Settings as SettingsIcon, BookOpen as BookOpenIcon, Play as PlayIcon, Menu as MenuIcon, Zap as ZapIcon, Loader2 as Loader2Icon, BarChart2 as BarChart2Icon, Clock as ClockIcon, ShieldAlert as ShieldAlertIcon, Building2 as Building2Icon, Tag as TagIcon, Layers as LayersIcon, FileText as FileTextIcon } from 'lucide-vue-next'
 import { socketService } from '@/services/socketService'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { searchService, type SearchResult } from '@/services/searchService'

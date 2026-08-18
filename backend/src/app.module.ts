@@ -37,6 +37,49 @@ import { SlaPolicy } from './sla/entities/sla-policy.entity';
 import { AiModule } from './ai/ai.module';
 import { AuditLog } from './audit/entities/audit-log.entity';
 import { AuditModule } from './audit/audit.module';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { Organization } from './organizations/entities/organization.entity';
+import { TagsModule } from './tags/tags.module';
+import { Tag } from './tags/entities/tag.entity';
+import { TicketTag } from './tags/entities/ticket-tag.entity';
+import { OverviewsModule } from './overviews/overviews.module';
+import { Overview } from './overviews/entities/overview.entity';
+import { TextModulesModule } from './text-modules/text-modules.module';
+import { TextModule } from './text-modules/entities/text-module.entity';
+import { ChecklistsModule } from './checklists/checklists.module';
+import { Checklist } from './checklists/entities/checklist.entity';
+import { ChecklistItem } from './checklists/entities/checklist-item.entity';
+import { MentionsModule } from './mentions/mentions.module';
+import { Mention } from './mentions/entities/mention.entity';
+import { TimeAccountingModule } from './time-accounting/time-accounting.module';
+import { TimeAccounting } from './time-accounting/entities/time-accounting.entity';
+import { ChatModule } from './chat/chat.module';
+import { ChatSession } from './chat/entities/chat-session.entity';
+import { ChatMessage } from './chat/entities/chat-message.entity';
+import { CtiModule } from './cti/cti.module';
+import { CtiLog } from './cti/entities/cti-log.entity';
+import { SmsModule } from './sms/sms.module';
+import { TelegramModule } from './telegram/telegram.module';
+import { FacebookModule } from './facebook/facebook.module';
+import { PostmasterFiltersModule } from './postmaster-filters/postmaster-filters.module';
+import { PostmasterFilter } from './postmaster-filters/entities/postmaster-filter.entity';
+import { AuthProvidersModule } from './auth-providers/auth-providers.module';
+import { LdapSource } from './auth-providers/entities/ldap-source.entity';
+import { ExternalCredential } from './auth-providers/entities/external-credential.entity';
+import { SecurityModule } from './security/security.module';
+import { PgpKey } from './security/entities/pgp-key.entity';
+import { SmimeCertificate } from './security/entities/smime-certificate.entity';
+import { SslCertificate } from './security/entities/ssl-certificate.entity';
+import { DataPrivacyModule } from './data-privacy/data-privacy.module';
+import { DataPrivacyTask } from './data-privacy/entities/data-privacy-task.entity';
+import { SchedulersModule } from './schedulers/schedulers.module';
+import { Scheduler } from './schedulers/entities/scheduler.entity';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { Webhook } from './webhooks/entities/webhook.entity';
+import { ImportModule } from './import/import.module';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { PublicLinksModule } from './public-links/public-links.module';
+import { PublicLink } from './public-links/entities/public-link.entity';
 
 @Module({
   imports: [
@@ -51,8 +94,8 @@ import { AuditModule } from './audit/audit.module';
         username: configService.get<string>('DB_USER', 'deskflow'),
         password: configService.get<string>('DB_PASS', 'deskflow_password'),
         database: configService.get<string>('DB_NAME', 'deskflow_db'),
-        entities: [User, Group, Role, Ticket, Article, TicketHistory, TicketLink, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle, Macro, Trigger, Setting, SlaPolicy, AuditLog],
-        synchronize: true, // APENAS PARA DESENVOLVIMENTO: cria tabelas automaticamente
+        entities: [User, Group, Role, Organization, Tag, TicketTag, Overview, TextModule, Checklist, ChecklistItem, Mention, TimeAccounting, ChatSession, ChatMessage, CtiLog, PostmasterFilter, LdapSource, ExternalCredential, PgpKey, SmimeCertificate, SslCertificate, DataPrivacyTask, Scheduler, Webhook, PublicLink, Ticket, Article, TicketHistory, TicketLink, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle, Macro, Trigger, Setting, SlaPolicy, AuditLog],
+        synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true', // true apenas em dev; em produção defina DB_SYNCHRONIZE=false e use migrations
       }),
     }),
     BullModule.forRootAsync({
@@ -65,7 +108,28 @@ import { AuditModule } from './audit/audit.module';
         },
       }),
     }),
-    IamModule, 
+    IamModule,
+    OrganizationsModule,
+    TagsModule,
+    OverviewsModule,
+    TextModulesModule,
+    ChecklistsModule,
+    MentionsModule,
+    TimeAccountingModule,
+    ChatModule,
+    CtiModule,
+    SmsModule,
+    TelegramModule,
+    FacebookModule,
+    PostmasterFiltersModule,
+    AuthProvidersModule,
+    SecurityModule,
+    DataPrivacyModule,
+    SchedulersModule,
+    WebhooksModule,
+    ImportModule,
+    IntegrationsModule,
+    PublicLinksModule,
     TicketsModule,
     NotificationsModule,
     KbModule,

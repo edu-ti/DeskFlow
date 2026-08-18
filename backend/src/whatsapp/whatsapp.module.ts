@@ -6,14 +6,14 @@ import { User } from '../iam/entities/user.entity';
 import { Role } from '../iam/entities/role.entity';
 import { TicketsModule } from '../tickets/tickets.module';
 import { SettingsModule } from '../settings/settings.module';
-import { HttpModule,
-    forwardRef(() => AiModule) } from '@nestjs/axios';
+import { HttpModule } from '@nestjs/axios';
 import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Role]),
     forwardRef(() => TicketsModule),
+    forwardRef(() => AiModule),
     SettingsModule,
     HttpModule
   ],

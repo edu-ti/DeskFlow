@@ -1,1 +1,19 @@
-import { Controller, Post, Param, UseGuards } from '@nestjs/common';\nimport { AiService } from './ai.service';\nimport { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';\n\n@Controller('ai')\n@UseGuards(JwtAuthGuard)\nexport class AiController {\n  constructor(private readonly aiService: AiService) {}\n\n  @Post('tickets/:id/summarize')\n  async summarize(@Param('id') id: string) {\n    return this.aiService.summarizeTicket(+id);\n  }\n\n  @Post('tickets/:id/suggest-reply')\n  async suggestReply(@Param('id') id: string) {\n    return this.aiService.suggestReply(+id);\n  }\n}
+import { Controller, Post, Param, UseGuards } from '@nestjs/common';
+import { AiService } from './ai.service';
+import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
+
+@Controller('ai')
+@UseGuards(JwtAuthGuard)
+export class AiController {
+  constructor(private readonly aiService: AiService) {}
+
+  @Post('tickets/:id/summarize')
+  async summarize(@Param('id') id: string) {
+    return this.aiService.summarizeTicket(+id);
+  }
+
+  @Post('tickets/:id/suggest-reply')
+  async suggestReply(@Param('id') id: string) {
+    return this.aiService.suggestReply(+id);
+  }
+}

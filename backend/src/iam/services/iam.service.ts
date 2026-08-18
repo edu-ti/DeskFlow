@@ -61,7 +61,7 @@ export class IamService implements OnModuleInit {
   }
 
   async findAllUsers(): Promise<User[]> {
-    return this.userRepository.find({ relations: { roles: true, groups: true } });
+    return this.userRepository.find({ relations: { roles: true, groups: true, organization: true } });
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {
@@ -77,13 +77,24 @@ export class IamService implements OnModuleInit {
     if (data.groups) {
       user.groups = data.groups;
     }
+    if (data.organization_id !== undefined) {
+      user.organization_id = data.organization_id;
+    }
     
     Object.assign(user, {
-      login: data.login || user.login,
-      firstname: data.firstname || user.firstname,
-      lastname: data.lastname || user.lastname,
-      email: data.email || user.email,
+      login: data.login ?? user.login,
+      firstname: data.firstname ?? user.firstname,
+      lastname: data.lastname ?? user.lastname,
+      email: data.email ?? user.email,
+      phone: data.phone ?? user.phone,
+      job_title: data.job_title ?? user.job_title,
+      department: data.department ?? user.department,
+      unit: data.unit ?? user.unit,
     });
+    
+    if (data.is_active !== undefined) {
+      user.is_active = data.is_active;
+    }
     
     return this.userRepository.save(user);
   }

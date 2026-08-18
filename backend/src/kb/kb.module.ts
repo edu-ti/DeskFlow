@@ -15,5 +15,6 @@ import { IamModule } from '../iam/iam.module';
   ],
   controllers: [KbAdminController, KbPublicController],
   providers: [KbAdminService, KbPublicService],
+  exports: [KbAdminService, KbPublicService],
 })
 export class KbModule {}

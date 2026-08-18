@@ -42,5 +42,23 @@ export const adminService = {
     // Assuming we'll need this for the user form
     const response = await api.get('/iam/roles') // We don't have this yet, wait, we do in IamController?
     return response.data
+  },
+
+  // Organizations
+  async getOrganizations() {
+    const response = await api.get('/organizations')
+    return response.data
+  },
+  async createOrganization(data: any) {
+    const response = await api.post('/organizations', data)
+    return response.data
+  },
+  async updateOrganization(id: number, data: any) {
+    const response = await api.patch(`/organizations/${id}`, data)
+    return response.data
+  },
+  async deleteOrganization(id: number) {
+    const response = await api.delete(`/organizations/${id}`)
+    return response.data
   }
 }
