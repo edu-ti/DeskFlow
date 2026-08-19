@@ -12,8 +12,8 @@ export interface Article {
   content: string;
   is_published: boolean;
   is_internal: boolean;
-  category_id: number;
-  category: Category;
+  category_id: number | null;
+  category: Category | null;
   author_id: number;
   author: any;
   created_at: string;

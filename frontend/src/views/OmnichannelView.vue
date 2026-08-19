@@ -790,7 +790,7 @@ const filteredUsersForGroup = computed(() => {
   return allUsers.value.filter(u => u.groups?.some((g: any) => g.id === transferGroupId.value))
 })
 
-const activeTab = ref(2) // Default Aberto
+const activeTab = ref<number | string>(2) // Default Aberto
 const searchQuery = ref('')
 const tickets = ref<any[]>([])
 const isLoadingTickets = ref(true)
@@ -1112,7 +1112,8 @@ const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
     const file = target.files[0]
-    selectedFile.value = file as any
+    if (!file) return
+    selectedFile.value = file
     if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
       previewUrl.value = URL.createObjectURL(file)
     } else {

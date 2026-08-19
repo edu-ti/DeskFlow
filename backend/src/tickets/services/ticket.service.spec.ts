@@ -5,10 +5,14 @@ import { Ticket } from '../entities/ticket.entity';
 import { Article } from '../entities/article.entity';
 import { TicketHistory } from '../entities/ticket-history.entity';
 import { TicketCustomFieldValue } from '../entities/ticket-custom-field-value.entity';
+import { TicketLink } from '../entities/ticket-link.entity';
 import { Repository } from 'typeorm';
 import { getQueueToken } from '@nestjs/bullmq';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { SmtpService } from '../../email/services/smtp.service';
+import { SlaPoliciesService } from '../../sla/services/sla-policies.service';
+import { WhatsappService } from '../../whatsapp/whatsapp.service';
 
 describe('TicketService (PT-002 - Soft Delete)', () => {
   let service: TicketService;
@@ -48,6 +52,10 @@ describe('TicketService (PT-002 - Soft Delete)', () => {
           useValue: {},
         },
         {
+          provide: getRepositoryToken(TicketLink),
+          useValue: {},
+        },
+        {
           provide: getQueueToken('sla-queue'),
           useValue: {},
         },
@@ -57,6 +65,18 @@ describe('TicketService (PT-002 - Soft Delete)', () => {
         },
         {
           provide: SmtpService,
+          useValue: {},
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
+        {
+          provide: SlaPoliciesService,
+          useValue: {},
+        },
+        {
+          provide: WhatsappService,
           useValue: {},
         },
       ],

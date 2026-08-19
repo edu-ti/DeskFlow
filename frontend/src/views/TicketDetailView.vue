@@ -305,6 +305,37 @@ const isAdminOrAgent = ref(false)
 const agents = ref<any[]>([])
 const macros = ref<any[]>([])
 const showMacroDropdown = ref(false)
+const aiSummary = ref('')
+const isGeneratingSummary = ref(false)
+const isGeneratingSuggestion = ref(false)
+
+const generateAiSummary = async () => {
+  if (!ticket.value) return
+  isGeneratingSummary.value = true
+  try {
+    const res = await api.post(`/ai/tickets/${ticket.value.id}/summarize`)
+    aiSummary.value = res.data.summary
+  } catch (error) {
+    console.error('Failed to generate AI summary', error)
+    alert('Não foi possível gerar o resumo com IA.')
+  } finally {
+    isGeneratingSummary.value = false
+  }
+}
+
+const generateAiSuggestion = async () => {
+  if (!ticket.value) return
+  isGeneratingSuggestion.value = true
+  try {
+    const res = await api.post(`/ai/tickets/${ticket.value.id}/suggest-reply`)
+    replyText.value = res.data.suggestion
+  } catch (error) {
+    console.error('Failed to generate AI suggestion', error)
+    alert('Não foi possível sugerir resposta com IA.')
+  } finally {
+    isGeneratingSuggestion.value = false
+  }
+}
 
 const getInitials = (first = '', last = '') => {
   return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || 'U'
