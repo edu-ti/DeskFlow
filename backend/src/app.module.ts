@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -144,9 +146,10 @@ import { PublicLink } from './public-links/entities/public-link.entity';
     AiModule,
     AuditModule,
     ScheduleModule.forRoot(),
-    EventEmitterModule.forRoot()
+    EventEmitterModule.forRoot(),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

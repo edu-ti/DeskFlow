@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { User } from './entities/user.entity';
 import { Group } from './entities/group.entity';
 import { Role } from './entities/role.entity';
@@ -13,10 +14,14 @@ import { GroupsController } from './controllers/groups.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Group, Role]),
-    JwtModule.register({
+    JwtModule.registerAsync({
       global: true,
-      secret: 'deskflow-super-secret-key-change-in-prod', // MUST be in env!
-      signOptions: { expiresIn: '1d' },
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET', 'dev-secret-change-in-env'),
+        signOptions: { expiresIn: '1d' },
+      }),
     }),
   ],
   controllers: [IamController, UsersController, GroupsController],

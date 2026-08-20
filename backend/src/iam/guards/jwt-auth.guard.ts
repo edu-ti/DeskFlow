@@ -15,9 +15,7 @@ export class JwtAuthGuard implements CanActivate {
     }
     
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: 'deskflow-super-secret-key-change-in-prod' // MUST be in env!
-      });
+      const payload = await this.jwtService.verifyAsync(token);
       // 💡 We're assigning the payload to the request object here
       // so that we can access it in our route handlers
       request['user'] = { id: payload.sub, email: payload.email, roles: payload.roles || [] };

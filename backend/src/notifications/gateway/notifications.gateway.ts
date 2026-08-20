@@ -3,16 +3,19 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  SubscribeMessage,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: allowedOrigins.length ? allowedOrigins : '*',
   },
 })
 export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -21,34 +24,28 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
   private readonly logger = new Logger(NotificationsGateway.name);
 
-  constructor(
-    private jwtService: JwtService,
-    private configService: ConfigService,
-  ) {}
+  constructor(private jwtService: JwtService) {}
 
-  async handleConnection(client: Socket) {
-    try {
-      const authHeader = client.handshake.auth?.token || client.handshake.headers?.authorization;
-      if (!authHeader) {
-        throw new Error('No token provided');
+  afterInit(server: Server) {
+    server.use((socket, next) => {
+      try {
+        const authHeader = socket.handshake.auth?.token || socket.handshake.headers?.authorization;
+        if (!authHeader) {
+          return next(new Error('Authentication token is missing'));
+        }
+        const token = authHeader.replace('Bearer ', '');
+        socket.data.user = this.jwtService.verify(token);
+        next();
+      } catch {
+        next(new Error('Unauthorized'));
       }
+    });
+  }
 
-      const token = authHeader.replace('Bearer ', '');
-      const secret = this.configService.get<string>('JWT_SECRET', 'super-secret');
-      
-      const payload = this.jwtService.verify(token, { secret });
-      const userId = payload.sub;
-
-      client.data.user = payload;
-      
-      // Join a room specific to the user
-      client.join(`user_${userId}`);
-      
-      this.logger.log(`Client connected: ${client.id} (User: ${userId})`);
-    } catch (error) {
-      this.logger.error(`Connection failed: ${error instanceof Error ? error.message : String(error)}`);
-      client.disconnect();
-    }
+  handleConnection(client: Socket) {
+    const userId = client.data.user?.sub;
+    client.join(`user_${userId}`);
+    this.logger.log(`Client connected: ${client.id} (User: ${userId})`);
   }
 
   handleDisconnect(client: Socket) {
