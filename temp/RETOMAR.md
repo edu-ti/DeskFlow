@@ -1,6 +1,6 @@
 # RETOMAR — Estado atual e próximos passos
 
-> Atualizado em 2026-08-19
+> Atualizado em 2026-08-20
 > Projeto: DeskFlow (novo sistema) · Legado: Zammad (`zammad-develop`)
 
 ---
@@ -84,23 +84,53 @@ Correções aplicadas nesta sessão (todas em `DeskFlow`):
 
 ### Mudanças commitadas (DeskFlow)
 
-O trabalho desta sessão (correções de `ticket.service.spec.ts`, `useToast.spec.ts`,
-`kbAdminService.ts`, `OmnichannelView.vue`, `TicketDetailView.vue` + novos módulos) já foi
-commitado em `3a55e9d`. `git status` está limpo, exceto pela pasta `temp/` (untracked),
-que contém este `RETOMAR.md` e o `gap-analysis.md`.
+- Sessões anteriores commitadas em `3a55e9d` e `489912e` (docs `temp/`).
+- Sessão 2026-08-20 commitada em `9b33768`/`90190b7` (IAM + login) e `afa2ec2`
+  (DTOs + tipagem de `req.user`). `git status` está limpo.
+
+### Sessão 2026-08-20 — hardening de segurança + DTOs + tipagem
+
+1. **Segurança:**
+   - `backend/.env` removido do git (`git rm --cached`) e adicionado ao `.gitignore`;
+     criado `backend/.env.example` com todas as variáveis (placeholders).
+   - Senha de usuário agora é hasheada com `bcrypt` em `iam.service.ts`
+     (`createUser`/`updateUser`); removido fallback `123456`. Usuários sem senha
+     (criados por email de entrada) recebem senha aleatória (`randomBytes`).
+   - `payload.json` (amostra webhook WhatsApp) movido para
+     `backend/scripts/whatsapp-webhook-sample.json`.
+   - `LoginView.vue`: removidos defaults `admin@example.com` / `admin123`.
+
+2. **DTOs com `class-validator`** (antes `any`/`Partial<Entity>`): organizations, tags,
+   text-modules, overviews, webhooks, postmaster-filters, sla-policies, time-accounting,
+   cti, macros, triggers, kb (categorias/artigos), custom-fields, checklists,
+   auth-providers (LDAP/OAuth), security (PGP/S-MIME/SSL), schedulers, data-privacy,
+   groups, users (create/update) e `addArticle` em tickets.
+
+3. **Tipagem de `req.user`:** nova interface `AuthenticatedRequest`
+   (`iam/interfaces/authenticated-request.interface.ts`); 9 controllers tipados.
+
+4. **Bugs corrigidos no caminho:**
+   - `kb-admin.controller.ts`: `req.user.sub` → `req.user.id` (author_id ia undefined).
+   - `kb-public.controller.ts`: `roles.map(r => r.name)` → `roles` (roles já é `string[]`).
+   - `audit.controller.ts`: `req.user?.userId` → `req.user.id`.
+
+5. **Verificação:** backend `tsc --noEmit` = 0 erros · `jest` = 5 suites / 13 testes.
+
+Os `any` restantes são só webhooks inbound de terceiros (Facebook/WhatsApp/Telegram) — intencional.
 
 ---
 
-## Como retomar
+## Como retomar (pendências para amanhã)
 
-1. **Reiniciar o backend** para aplicar os campos novos de `User`/`Organization`
-   (comando na pasta `backend`):
-   ```
-   npm run start:dev
-   ```
-2. Recarregar o frontend (F5).
-3. Pendências M-01/M-02 resolvidas (ver notas acima). Resta apenas commitar a pasta
-   `temp/` se desejar versionar a documentação.
+1. **Cobertura de testes** (ainda baixa: 13 testes p/ 39 entities + 45 services +
+   40 controllers). Priorizar e2e dos fluxos core: auth/login, ticket (criar/transferir),
+   import CSV.
+2. **README raiz** com instruções de subida (backend + frontend + docker-compose);
+   hoje só há README dentro de `backend/` e `frontend/`.
+3. Opcional: ligar `strict: true` no `tsconfig.json` do backend gradualmente
+   (hoje só `noImplicitAny` está ativo).
+4. Opcional: subir `pinia` de `4.0.2` → `4.0.3` (patch).
+5. Reiniciar backend (`npm run start:dev`) e recarregar frontend para aplicar as mudanças.
 
 - Para continuar evoluindo o código, trabalhe em `D:\SISTEMAS\DESKFLOW\DeskFlow`.
 - Para atualizar specs/análise, use o Reversa em `D:\SISTEMAS\DESKFLOW\zammad-develop`.
