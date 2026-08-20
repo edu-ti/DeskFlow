@@ -11,6 +11,6 @@ import { IamModule } from '../iam/iam.module';
   imports: [TypeOrmModule.forFeature([Notification, User]), IamModule],
   providers: [NotificationsService, NotificationsGateway],
   controllers: [NotificationsController],
-  exports: [NotificationsService],
+  exports: [NotificationsService, NotificationsGateway],
 })
 export class NotificationsModule {}

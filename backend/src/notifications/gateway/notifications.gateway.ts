@@ -43,8 +43,14 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   }
 
   handleConnection(client: Socket) {
-    const userId = client.data.user?.sub;
-    client.join(`user_${userId}`);
+    const payload = client.data.user as { sub?: number; roles?: string[] } | undefined;
+    const userId = payload?.sub;
+    if (userId != null) {
+      client.join(`user_${userId}`);
+    }
+    if (payload?.roles?.includes('agent') || payload?.roles?.includes('admin')) {
+      client.join('agents');
+    }
     this.logger.log(`Client connected: ${client.id} (User: ${userId})`);
   }
 
@@ -54,5 +60,9 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
   sendNotificationToUser(userId: number, notification: any) {
     this.server.to(`user_${userId}`).emit('notification', notification);
+  }
+
+  sendCallEvent(event: string, payload: any) {
+    this.server.to('agents').emit(event, payload);
   }
 }

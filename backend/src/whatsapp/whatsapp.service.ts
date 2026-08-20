@@ -7,8 +7,10 @@ import { firstValueFrom } from 'rxjs';
 import { User } from '../iam/entities/user.entity';
 import { Role } from '../iam/entities/role.entity';
 import { TicketService } from '../tickets/services/ticket.service';
+import { Ticket } from '../tickets/entities/ticket.entity';
 import { SettingsService } from '../settings/services/settings.service';
 import { AiService } from '../ai/ai.service';
+import { GRAPH_API_BASE } from '../common/graph-api.constants';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -29,6 +31,65 @@ export class WhatsappService {
     @Inject(forwardRef(() => AiService))
     private readonly aiService: AiService,
   ) {}
+
+  async getOrCreateCustomerUser(fromPhone: string, profileName?: string): Promise<User> {
+    let user = await this.userRepository.findOne({ where: { phone: fromPhone } });
+    if (!user) {
+      const tempEmail = `${fromPhone}@whatsapp.local`;
+      const passwordHash = await bcrypt.hash(fromPhone + process.env.JWT_SECRET, 10);
+      const customerRole = await this.roleRepository.findOne({ where: { name: 'customer' } });
+      const roles = customerRole ? [customerRole] : [];
+      user = this.userRepository.create({
+        login: fromPhone,
+        firstname: profileName?.split(' ')[0] || 'Cliente',
+        lastname: profileName?.split(' ').slice(1).join(' ') || 'WhatsApp',
+        email: tempEmail,
+        phone: fromPhone,
+        password_hash: passwordHash,
+        roles,
+      });
+      user = await this.userRepository.save(user);
+    }
+    return user;
+  }
+
+  async findActiveWhatsAppTicket(customerId: number): Promise<Ticket | null> {
+    return this.ticketService['ticketRepository'].findOne({
+      where: {
+        customer_id: customerId,
+        source: 'whatsapp',
+        state_id: In([1, 2, 3, 4, 6]),
+      },
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findOrCreateTicketForPhone(
+    fromPhone: string,
+    profileName: string,
+    title: string,
+  ): Promise<{ user: User; ticket: Ticket }> {
+    const user = await this.getOrCreateCustomerUser(fromPhone, profileName);
+    let ticket = await this.findActiveWhatsAppTicket(user.id);
+    if (!ticket) {
+      ticket = await this.ticketService.createTicket(
+        { title, customer_id: user.id, group_id: 1, priority_id: 2, state_id: 1, source: 'whatsapp' },
+        '',
+      );
+    }
+    return { user, ticket };
+  }
+
+  async addCallArticle(ticketId: number, state: { from: string; to: string; direction?: string; status?: string }, duration?: number) {
+    const dirLabel = state.direction === 'BUSINESS_INITIATED' ? 'Saída' : 'Entrada';
+    const summary =
+      `📞 **Chamada de voz WhatsApp (${dirLabel})**\n` +
+      `- De: ${state.from}\n` +
+      `- Para: ${state.to}\n` +
+      `- Status: ${state.status || 'finalizada'}\n` +
+      `- Duração: ${duration ? `${duration}s` : 'não informada'}`;
+    await this.ticketService.addArticle(ticketId, summary, 'note', true, undefined, []);
+  }
 
   async handleIncomingMessage(fromPhone: string, profileName: string, text: string, phoneNumberId: string, media?: any) {
     this.logger.log(`Received WhatsApp message from ${fromPhone}: ${text} (Media: ${!!media})`);
@@ -120,7 +181,7 @@ export class WhatsappService {
       if (!token) return [];
 
       // 1. Get Media URL
-      const mediaInfoUrl = `https://graph.facebook.com/v19.0/${media.id}`;
+      const mediaInfoUrl = `${GRAPH_API_BASE}/${media.id}`;
       const infoResponse = await firstValueFrom(this.httpService.get(mediaInfoUrl, {
         headers: { Authorization: `Bearer ${token}` }
       }));
@@ -166,7 +227,7 @@ export class WhatsappService {
       return;
     }
 
-    const url = `https://graph.facebook.com/v19.0/${phoneId}/messages`;
+    const url = `${GRAPH_API_BASE}/${phoneId}/messages`;
     
     try {
       await firstValueFrom(this.httpService.post(url, {
@@ -203,7 +264,7 @@ export class WhatsappService {
       formData.append('type', mimeType);
       formData.append('messaging_product', 'whatsapp');
 
-      const uploadUrl = `https://graph.facebook.com/v19.0/${phoneId}/media`;
+      const uploadUrl = `${GRAPH_API_BASE}/${phoneId}/media`;
       const uploadResponse = await firstValueFrom(
         this.httpService.post(uploadUrl, formData, {
           headers: {
@@ -220,7 +281,7 @@ export class WhatsappService {
       else if (mimeType.startsWith('video/')) messageType = 'video';
       else if (mimeType.startsWith('audio/')) messageType = 'audio';
 
-      const messageUrl = `https://graph.facebook.com/v19.0/${phoneId}/messages`;
+      const messageUrl = `${GRAPH_API_BASE}/${phoneId}/messages`;
       const messageBody: any = {
         messaging_product: 'whatsapp',
         to: toPhone,

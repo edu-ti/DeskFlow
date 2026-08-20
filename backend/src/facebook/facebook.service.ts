@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SettingsService } from '../settings/services/settings.service';
 import axios from 'axios';
+import { GRAPH_API_BASE } from '../common/graph-api.constants';
 
 @Injectable()
 export class FacebookService {
@@ -23,7 +24,7 @@ export class FacebookService {
       return { skipped: true, reason: 'facebook_not_configured' };
     }
     const response = await axios.post(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${token}`,
+      `${GRAPH_API_BASE}/me/messages?access_token=${token}`,
       { recipient: { id: recipientId }, message: { text } },
     );
     return response.data;

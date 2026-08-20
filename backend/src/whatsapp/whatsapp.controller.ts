@@ -1,12 +1,14 @@
 import { Controller, Get, Post, Body, Req, Res, HttpStatus } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { WhatsappService } from './whatsapp.service';
+import { WhatsappCallingService } from './whatsapp-calling.service';
 import { SettingsService } from '../settings/services/settings.service';
 
 @Controller('whatsapp')
 export class WhatsappController {
   constructor(
     private readonly whatsappService: WhatsappService,
+    private readonly whatsappCallingService: WhatsappCallingService,
     private readonly settingsService: SettingsService
   ) {}
 
@@ -48,30 +50,41 @@ export class WhatsappController {
         if (
           body.entry &&
           body.entry[0].changes &&
-          body.entry[0].changes[0] &&
-          body.entry[0].changes[0].value.messages &&
-          body.entry[0].changes[0].value.messages[0]
+          body.entry[0].changes[0]
         ) {
-          const message = body.entry[0].changes[0].value.messages[0];
-          const phoneNumberId = body.entry[0].changes[0].value.metadata.phone_number_id;
-          const from = message.from; // sender's phone number
-          const type = message.type;
-          
-          let msgBody = '';
-          let media = null;
+          const change = body.entry[0].changes[0];
 
-          if (type === 'text') {
-            msgBody = message.text?.body;
-          } else if (['image', 'audio', 'video', 'document'].includes(type)) {
-            media = message[type];
-            msgBody = media.caption || `[Mídia recebida: ${type}]`;
+          // Eventos de chamada (Calling API)
+          if (change.field === 'calls' && change.value?.calls?.length) {
+            await this.whatsappCallingService.handleCallWebhook(change.value);
+            return res.sendStatus(HttpStatus.OK);
           }
-          
-          const contacts = body.entry[0].changes[0].value.contacts;
-          const profileName = contacts && contacts[0] ? contacts[0].profile.name : 'Unknown';
 
-          if (msgBody || media) {
-            await this.whatsappService.handleIncomingMessage(from, profileName, msgBody, phoneNumberId, media);
+          if (
+            change.value.messages &&
+            change.value.messages[0]
+          ) {
+            const message = change.value.messages[0];
+            const phoneNumberId = change.value.metadata.phone_number_id;
+            const from = message.from; // sender's phone number
+            const type = message.type;
+            
+            let msgBody = '';
+            let media = null;
+
+            if (type === 'text') {
+              msgBody = message.text?.body;
+            } else if (['image', 'audio', 'video', 'document'].includes(type)) {
+              media = message[type];
+              msgBody = media.caption || `[Mídia recebida: ${type}]`;
+            }
+            
+            const contacts = change.value.contacts;
+            const profileName = contacts && contacts[0] ? contacts[0].profile.name : 'Unknown';
+
+            if (msgBody || media) {
+              await this.whatsappService.handleIncomingMessage(from, profileName, msgBody, phoneNumberId, media);
+            }
           }
         }
         res.sendStatus(HttpStatus.OK);

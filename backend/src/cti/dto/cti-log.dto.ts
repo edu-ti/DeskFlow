@@ -26,6 +26,22 @@ export class CreateCtiLogDto {
   queue?: string;
 
   @IsOptional()
+  @IsString()
+  caller_name?: string;
+
+  @IsOptional()
+  @IsNumber()
+  ticket_id?: number;
+
+  @IsOptional()
+  @IsNumber()
+  duration?: number;
+
+  @IsOptional()
+  @IsString()
+  sdp?: string;
+
+  @IsOptional()
   @IsNumber()
   user_id?: number;
 

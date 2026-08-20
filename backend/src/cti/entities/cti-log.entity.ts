@@ -23,8 +23,20 @@ export class CtiLog {
   @Column({ nullable: true })
   queue: string;
 
-  @Column({ name: 'user_id', nullable: true })
-  user_id: number;
+  @Column({ type: 'varchar', name: 'caller_name', nullable: true })
+  caller_name?: string | null;
+
+  @Column({ type: 'int', name: 'ticket_id', nullable: true })
+  ticket_id?: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  duration?: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  sdp?: string | null;
+
+  @Column({ type: 'int', name: 'user_id', nullable: true })
+  user_id?: number | null;
 
   @Column({ type: 'text', nullable: true })
   comment: string;
