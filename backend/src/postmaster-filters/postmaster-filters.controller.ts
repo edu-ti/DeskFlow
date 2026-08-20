@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { PostmasterFiltersService } from './postmaster-filters.service';
-import { PostmasterFilter } from './entities/postmaster-filter.entity';
+import { CreatePostmasterFilterDto, UpdatePostmasterFilterDto } from './dto/postmaster-filter.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -18,13 +18,13 @@ export class PostmasterFiltersController {
 
   @Post()
   @Roles('admin')
-  create(@Body() data: Partial<PostmasterFilter>) {
+  create(@Body() data: CreatePostmasterFilterDto) {
     return this.filterService.create(data);
   }
 
   @Patch(':id')
   @Roles('admin')
-  update(@Param('id') id: string, @Body() data: Partial<PostmasterFilter>) {
+  update(@Param('id') id: string, @Body() data: UpdatePostmasterFilterDto) {
     return this.filterService.update(+id, data);
   }
 

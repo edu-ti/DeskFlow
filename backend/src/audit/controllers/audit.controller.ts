@@ -3,6 +3,7 @@ import { AuditService } from '../services/audit.service';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { RolesGuard } from '../../iam/guards/roles.guard';
 import { Roles } from '../../iam/decorators/roles.decorator';
+import type { AuthenticatedRequest } from '../../iam/interfaces/authenticated-request.interface';
 
 @Controller('audit-logs')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -50,8 +51,8 @@ export class AuditController {
 
   @Post('anonymize-user/:id')
   @Roles('admin')
-  async anonymizeUser(@Param('id') id: string, @Request() req: any) {
-    const actorId = req.user?.userId || req.user?.id || 1;
+  async anonymizeUser(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    const actorId = req.user.id || 1;
     return this.auditService.anonymizeUser(+id, actorId, req);
   }
 }

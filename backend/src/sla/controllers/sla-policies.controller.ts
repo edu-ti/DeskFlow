@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { SlaPoliciesService } from '../services/sla-policies.service';
 import { SlaPolicy } from '../entities/sla-policy.entity';
+import { CreateSlaPolicyDto, UpdateSlaPolicyDto } from '../dto/sla-policy.dto';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { RolesGuard } from '../../iam/guards/roles.guard';
 import { Roles } from '../../iam/decorators/roles.decorator';
@@ -18,7 +19,7 @@ export class SlaPoliciesController {
 
   @Post()
   @Roles('admin')
-  async create(@Body() data: Partial<SlaPolicy>): Promise<SlaPolicy> {
+  async create(@Body() data: CreateSlaPolicyDto): Promise<SlaPolicy> {
     return this.slaPoliciesService.create(data);
   }
 
@@ -26,7 +27,7 @@ export class SlaPoliciesController {
   @Roles('admin')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: Partial<SlaPolicy>
+    @Body() data: UpdateSlaPolicyDto
   ): Promise<SlaPolicy> {
     return this.slaPoliciesService.update(id, data);
   }

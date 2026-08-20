@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { TextModulesService } from './text-modules.service';
-import { TextModule } from './entities/text-module.entity';
+import { CreateTextModuleDto, UpdateTextModuleDto } from './dto/text-module.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -30,13 +30,13 @@ export class TextModulesController {
 
   @Post()
   @Roles('admin')
-  create(@Body() data: Partial<TextModule>) {
+  create(@Body() data: CreateTextModuleDto) {
     return this.textModulesService.create(data);
   }
 
   @Patch(':id')
   @Roles('admin')
-  update(@Param('id') id: string, @Body() data: Partial<TextModule>) {
+  update(@Param('id') id: string, @Body() data: UpdateTextModuleDto) {
     return this.textModulesService.update(+id, data);
   }
 

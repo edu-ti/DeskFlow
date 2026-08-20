@@ -3,6 +3,7 @@ import { MentionsService } from './mentions.service';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
+import type { AuthenticatedRequest } from '../iam/interfaces/authenticated-request.interface';
 
 @Controller('mentions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -17,13 +18,13 @@ export class MentionsController {
 
   @Get('me')
   @Roles('admin', 'agent', 'customer')
-  listByUser(@Req() req: any) {
+  listByUser(@Req() req: AuthenticatedRequest) {
     return this.mentionsService.listByUser(req.user?.id);
   }
 
   @Post('ticket/:ticketId')
   @Roles('admin', 'agent')
-  add(@Param('ticketId') ticketId: string, @Body() body: { user_id: number }, @Req() req: any) {
+  add(@Param('ticketId') ticketId: string, @Body() body: { user_id: number }, @Req() req: AuthenticatedRequest) {
     return this.mentionsService.addMention(+ticketId, body.user_id, req.user?.id);
   }
 

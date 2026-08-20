@@ -1,9 +1,10 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { OverviewsService } from './overviews.service';
-import { Overview } from './entities/overview.entity';
+import { CreateOverviewDto, UpdateOverviewDto } from './dto/overview.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
+import type { AuthenticatedRequest } from '../iam/interfaces/authenticated-request.interface';
 
 @Controller('overviews')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -12,7 +13,7 @@ export class OverviewsController {
 
   @Get('available')
   @Roles('admin', 'agent', 'customer')
-  available(@Req() req: any) {
+  available(@Req() req: AuthenticatedRequest) {
     return this.overviewsService.findAvailable(req.user?.roles || []);
   }
 
@@ -30,13 +31,13 @@ export class OverviewsController {
 
   @Post()
   @Roles('admin')
-  create(@Body() data: Partial<Overview>) {
+  create(@Body() data: CreateOverviewDto) {
     return this.overviewsService.create(data);
   }
 
   @Patch(':id')
   @Roles('admin')
-  update(@Param('id') id: string, @Body() data: Partial<Overview>) {
+  update(@Param('id') id: string, @Body() data: UpdateOverviewDto) {
     return this.overviewsService.update(+id, data);
   }
 

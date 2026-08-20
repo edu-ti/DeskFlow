@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Param, Patch, Delete, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
 import { CustomFieldsService } from '../services/custom-fields.service';
+import { CreateCustomFieldDto, UpdateCustomFieldDto } from '../dto/custom-field.dto';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { RolesGuard } from '../../iam/guards/roles.guard';
 import { Roles } from '../../iam/decorators/roles.decorator';
@@ -22,7 +23,7 @@ export class CustomFieldsController {
 
   @Roles('admin')
   @Post()
-  async create(@Body() createData: any) {
+  async create(@Body() createData: CreateCustomFieldDto) {
     return this.customFieldsService.create(createData);
   }
 
@@ -30,7 +31,7 @@ export class CustomFieldsController {
   @Patch(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateData: any,
+    @Body() updateData: UpdateCustomFieldDto,
   ) {
     return this.customFieldsService.update(id, updateData);
   }

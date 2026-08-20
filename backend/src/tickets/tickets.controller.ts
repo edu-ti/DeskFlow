@@ -11,6 +11,7 @@ import { TransferTicketDto } from './dto/transfer-ticket.dto';
 import { TicketVisibilityGuard } from './guards/ticket-visibility.guard';
 import { SearchService } from '../search/search.service';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
+import type { AuthenticatedRequest } from '../iam/interfaces/authenticated-request.interface';
 
 @UseGuards(JwtAuthGuard)
 @Controller('tickets')
@@ -21,7 +22,7 @@ export class TicketsController {
   ) {}
 
   @Get()
-  async getTickets(@Request() req: any) {
+  async getTickets(@Request() req: AuthenticatedRequest) {
     return this.ticketService.findAll(req.user);
   }
 
@@ -31,7 +32,7 @@ export class TicketsController {
   }
 
   @Get('search')
-  async searchTickets(@Request() req: any) {
+  async searchTickets(@Request() req: AuthenticatedRequest) {
     const q = req.query.q as string;
     if (!q) return [];
     return this.searchService.searchTickets(q);
@@ -39,12 +40,12 @@ export class TicketsController {
 
   @Get(':id')
   @UseGuards(TicketVisibilityGuard)
-  async getTicket(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+  async getTicket(@Param('id', ParseIntPipe) id: number, @Request() req: AuthenticatedRequest) {
     return this.ticketService.findOne(id, req.user);
   }
 
   @Post()
-  async createTicket(@Body() createTicketDto: CreateTicketDto, @Request() req: any) {
+  async createTicket(@Body() createTicketDto: CreateTicketDto, @Request() req: AuthenticatedRequest) {
     const { initial_article_body, custom_fields, ...ticketData } = createTicketDto;
     
     // Ler o customer_id logado
@@ -68,11 +69,11 @@ export class TicketsController {
   }))
   async addArticle(
     @Param('id', ParseIntPipe) id: number,
-    @Body() addArticleDto: any,
-    @Request() req: any,
+    @Body() addArticleDto: AddArticleDto,
+    @Request() req: AuthenticatedRequest,
     @UploadedFile() file?: any,
   ) {
-    const isInternal = addArticleDto.is_internal === 'true' || addArticleDto.is_internal === true;
+    const isInternal = addArticleDto.is_internal === true;
     let attachments: any[] = [];
     if (file) {
       attachments = [{
@@ -82,7 +83,7 @@ export class TicketsController {
         localPath: file.path // Used for WhatsApp sending
       }];
     }
-    return this.ticketService.addArticle(id, addArticleDto.body, addArticleDto.type || 'note', isInternal, req.user.id, attachments);
+    return this.ticketService.addArticle(id, addArticleDto.body ?? '', addArticleDto.type || 'note', isInternal, req.user.id, attachments);
   }
 
   @Patch(':id/state')
@@ -90,7 +91,7 @@ export class TicketsController {
   async changeState(
     @Param('id', ParseIntPipe) id: number,
     @Body() changeStateDto: ChangeStateDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.ticketService.changeState(id, changeStateDto.state_id, req.user.id);
   }
@@ -100,7 +101,7 @@ export class TicketsController {
   async assignTicket(
     @Param('id', ParseIntPipe) id: number,
     @Body() assignTicketDto: AssignTicketDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.ticketService.assignTicket(id, assignTicketDto.owner_id, req.user.id);
   }
@@ -117,7 +118,7 @@ export class TicketsController {
   async changeTitle(
     @Param('id', ParseIntPipe) id: number,
     @Body('title') title: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.ticketService.changeTitle(id, title, req.user.id);
   }
@@ -127,7 +128,7 @@ export class TicketsController {
   async mergeTickets(
     @Param('id', ParseIntPipe) id: number,
     @Body('target_ticket_id', ParseIntPipe) targetTicketId: number,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     await this.ticketService.mergeTickets(id, targetTicketId, req.user.id);
     return { success: true, message: 'Ticket merged successfully' };
@@ -138,7 +139,7 @@ export class TicketsController {
   async createSubticket(
     @Param('id', ParseIntPipe) id: number,
     @Body('title') title: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     const subticket = await this.ticketService.createSubticket(id, req.user.id, title);
     return subticket;
@@ -149,7 +150,7 @@ export class TicketsController {
   async linkTickets(
     @Param('id', ParseIntPipe) id: number,
     @Body('target_ticket_id', ParseIntPipe) targetTicketId: number,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     const link = await this.ticketService.linkTickets(id, targetTicketId, req.user.id);
     return link;
@@ -160,7 +161,7 @@ export class TicketsController {
   async transferTicket(
     @Param('id', ParseIntPipe) id: number,
     @Body() transferDto: TransferTicketDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     const ticket = await this.ticketService.transferTicket(
       id,

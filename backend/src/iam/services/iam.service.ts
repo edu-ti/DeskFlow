@@ -7,7 +7,7 @@ import { User } from '../entities/user.entity';
 import { Group } from '../entities/group.entity';
 import { Role } from '../entities/role.entity';
 
-type CreateUserInput = Omit<Partial<User>, 'roles' | 'groups'> & {
+type UserInput = Omit<Partial<User>, 'roles' | 'groups'> & {
   password?: string;
   roles?: Array<{ id: number }>;
   groups?: Array<{ id: number }>;
@@ -46,7 +46,7 @@ export class IamService implements OnModuleInit {
     }
   }
 
-  async createUser(data: CreateUserInput): Promise<User> {
+  async createUser(data: UserInput): Promise<User> {
     const existing = await this.userRepository.findOne({ where: [{ email: data.email }, { login: data.login }] });
     if (existing) {
       throw new ConflictException('User with this email or login already exists');
@@ -73,7 +73,7 @@ export class IamService implements OnModuleInit {
     return this.userRepository.find({ relations: { roles: true, groups: true, organization: true } });
   }
 
-  async updateUser(id: number, data: Partial<User> & { password?: string }): Promise<User> {
+  async updateUser(id: number, data: UserInput): Promise<User> {
     const user = await this.findUserById(id);
     if (!user) {
       throw new ConflictException('User not found');
@@ -85,10 +85,10 @@ export class IamService implements OnModuleInit {
     
     // Handle roles and groups relation updates
     if (data.roles) {
-      user.roles = data.roles;
+      user.roles = data.roles as Role[];
     }
     if (data.groups) {
-      user.groups = data.groups;
+      user.groups = data.groups as Group[];
     }
     if (data.organization_id !== undefined) {
       user.organization_id = data.organization_id;

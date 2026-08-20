@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { SchedulersService } from './schedulers.service';
-import { Scheduler } from './entities/scheduler.entity';
+import { CreateSchedulerDto, UpdateSchedulerDto } from './dto/scheduler.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -24,13 +24,13 @@ export class SchedulersController {
 
   @Post()
   @Roles('admin')
-  create(@Body() data: Partial<Scheduler>) {
+  create(@Body() data: CreateSchedulerDto) {
     return this.schedulersService.create(data);
   }
 
   @Patch(':id')
   @Roles('admin')
-  update(@Param('id') id: string, @Body() data: Partial<Scheduler>) {
+  update(@Param('id') id: string, @Body() data: UpdateSchedulerDto) {
     return this.schedulersService.update(+id, data);
   }
 

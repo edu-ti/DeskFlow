@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { WebhooksService } from './webhooks.service';
-import { Webhook } from './entities/webhook.entity';
+import { CreateWebhookDto, UpdateWebhookDto } from './dto/webhook.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -18,13 +18,13 @@ export class WebhooksController {
 
   @Post()
   @Roles('admin')
-  create(@Body() data: Partial<Webhook>) {
+  create(@Body() data: CreateWebhookDto) {
     return this.webhooksService.create(data);
   }
 
   @Patch(':id')
   @Roles('admin')
-  update(@Param('id') id: string, @Body() data: Partial<Webhook>) {
+  update(@Param('id') id: string, @Body() data: UpdateWebhookDto) {
     return this.webhooksService.update(+id, data);
   }
 

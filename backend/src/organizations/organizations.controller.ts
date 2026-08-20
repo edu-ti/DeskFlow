@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
-import { Organization } from './entities/organization.entity';
+import { CreateOrganizationDto, UpdateOrganizationDto } from './dto/organization.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -22,12 +22,12 @@ export class OrganizationsController {
   }
 
   @Post()
-  create(@Body() data: Partial<Organization>) {
+  create(@Body() data: CreateOrganizationDto) {
     return this.organizationsService.create(data);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() data: Partial<Organization>) {
+  update(@Param('id') id: string, @Body() data: UpdateOrganizationDto) {
     return this.organizationsService.update(+id, data);
   }
 

@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { TagsService } from './tags.service';
-import { Tag } from './entities/tag.entity';
+import { CreateTagDto, UpdateTagDto } from './dto/tag.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -24,7 +24,7 @@ export class TagsController {
 
   @Post()
   @Roles('admin')
-  create(@Body() data: Partial<Tag>) {
+  create(@Body() data: CreateTagDto) {
     return this.tagsService.create(data);
   }
 
@@ -36,7 +36,7 @@ export class TagsController {
 
   @Patch(':id')
   @Roles('admin')
-  update(@Param('id') id: string, @Body() data: Partial<Tag>) {
+  update(@Param('id') id: string, @Body() data: UpdateTagDto) {
     return this.tagsService.update(+id, data);
   }
 

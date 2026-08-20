@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { ChecklistsService } from './checklists.service';
+import { UpdateChecklistItemDto } from './dto/checklist.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -35,7 +36,7 @@ export class ChecklistsController {
 
   @Patch('items/:itemId')
   @Roles('admin', 'agent')
-  updateItem(@Param('itemId') itemId: string, @Body() data: any) {
+  updateItem(@Param('itemId') itemId: string, @Body() data: UpdateChecklistItemDto) {
     return this.checklistsService.updateItem(+itemId, data);
   }
 

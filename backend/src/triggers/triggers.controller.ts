@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards } from '@nestjs/common';
 import { TriggersService } from './triggers.service';
+import { CreateTriggerDto, UpdateTriggerDto } from './dto/trigger.dto';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -11,7 +12,7 @@ export class TriggersController {
   constructor(private readonly triggersService: TriggersService) {}
 
   @Post()
-  create(@Body() createTriggerDto: any) {
+  create(@Body() createTriggerDto: CreateTriggerDto) {
     return this.triggersService.create(createTriggerDto);
   }
 
@@ -26,7 +27,7 @@ export class TriggersController {
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() updateTriggerDto: any) {
+  update(@Param('id') id: string, @Body() updateTriggerDto: UpdateTriggerDto) {
     return this.triggersService.update(+id, updateTriggerDto);
   }
 

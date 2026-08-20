@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { AuthProvidersService } from './auth-providers.service';
-import { LdapSource } from './entities/ldap-source.entity';
-import { ExternalCredential } from './entities/external-credential.entity';
+import { CreateLdapSourceDto, UpdateLdapSourceDto, CreateExternalCredentialDto, UpdateExternalCredentialDto } from './dto/auth-provider.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -20,13 +19,13 @@ export class AuthProvidersController {
 
   @Post('ldap')
   @Roles('admin')
-  createLdap(@Body() data: Partial<LdapSource>) {
+  createLdap(@Body() data: CreateLdapSourceDto) {
     return this.authProvidersService.createLdapSource(data);
   }
 
   @Patch('ldap/:id')
   @Roles('admin')
-  updateLdap(@Param('id') id: string, @Body() data: Partial<LdapSource>) {
+  updateLdap(@Param('id') id: string, @Body() data: UpdateLdapSourceDto) {
     return this.authProvidersService.updateLdapSource(+id, data);
   }
 
@@ -45,13 +44,13 @@ export class AuthProvidersController {
 
   @Post('credentials')
   @Roles('admin')
-  createCredential(@Body() data: Partial<ExternalCredential>) {
+  createCredential(@Body() data: CreateExternalCredentialDto) {
     return this.authProvidersService.createCredential(data);
   }
 
   @Patch('credentials/:id')
   @Roles('admin')
-  updateCredential(@Param('id') id: string, @Body() data: Partial<ExternalCredential>) {
+  updateCredential(@Param('id') id: string, @Body() data: UpdateExternalCredentialDto) {
     return this.authProvidersService.updateCredential(+id, data);
   }
 

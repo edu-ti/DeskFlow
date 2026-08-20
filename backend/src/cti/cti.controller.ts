@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { CtiService } from './cti.service';
-import { CtiLog } from './entities/cti-log.entity';
+import { CreateCtiLogDto } from './dto/cti-log.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
@@ -24,7 +24,7 @@ export class CtiController {
 
   @Post()
   @Roles('admin', 'agent')
-  create(@Body() data: Partial<CtiLog>) {
+  create(@Body() data: CreateCtiLogDto) {
     return this.ctiService.createLog(data);
   }
 

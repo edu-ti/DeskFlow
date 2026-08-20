@@ -1,9 +1,10 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { TimeAccountingService } from './time-accounting.service';
-import { TimeAccounting } from './entities/time-accounting.entity';
+import { CreateTimeAccountingDto, UpdateTimeAccountingDto } from './dto/time-accounting.dto';
 import { RolesGuard } from '../iam/guards/roles.guard';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
 import { Roles } from '../iam/decorators/roles.decorator';
+import type { AuthenticatedRequest } from '../iam/interfaces/authenticated-request.interface';
 
 @Controller('time-accounting')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -18,19 +19,19 @@ export class TimeAccountingController {
 
   @Get('me')
   @Roles('admin', 'agent')
-  listByUser(@Req() req: any) {
+  listByUser(@Req() req: AuthenticatedRequest) {
     return this.timeAccountingService.listByUser(req.user?.id);
   }
 
   @Post()
   @Roles('admin', 'agent')
-  create(@Body() data: Partial<TimeAccounting>, @Req() req: any) {
+  create(@Body() data: CreateTimeAccountingDto, @Req() req: AuthenticatedRequest) {
     return this.timeAccountingService.create({ ...data, user_id: req.user?.id });
   }
 
   @Patch(':id')
   @Roles('admin', 'agent')
-  update(@Param('id') id: string, @Body() data: Partial<TimeAccounting>) {
+  update(@Param('id') id: string, @Body() data: UpdateTimeAccountingDto) {
     return this.timeAccountingService.update(+id, data);
   }
 
