@@ -46,7 +46,7 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
       
       this.logger.log(`Client connected: ${client.id} (User: ${userId})`);
     } catch (error) {
-      this.logger.error(`Connection failed: ${error.message}`);
+      this.logger.error(`Connection failed: ${error instanceof Error ? error.message : String(error)}`);
       client.disconnect();
     }
   }

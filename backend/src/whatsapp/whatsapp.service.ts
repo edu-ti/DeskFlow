@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
+import { isAxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { User } from '../iam/entities/user.entity';
 import { Role } from '../iam/entities/role.entity';
@@ -181,7 +182,7 @@ export class WhatsappService {
       }));
       this.logger.log(`WhatsApp message sent to ${toPhone}`);
     } catch (error) {
-      this.logger.error(`Failed to send WhatsApp message to ${toPhone}:`, error.response?.data || error.message);
+      this.logger.error(`Failed to send WhatsApp message to ${toPhone}:`, this.extractError(error));
     }
   }
 
@@ -247,7 +248,17 @@ export class WhatsappService {
         await this.sendMessage(toPhone, text);
       }
     } catch (error) {
-      this.logger.error(`Failed to send WhatsApp media to ${toPhone}:`, error.response?.data || error.message);
+      this.logger.error(`Failed to send WhatsApp media to ${toPhone}:`, this.extractError(error));
     }
+  }
+
+  private extractError(error: unknown): any {
+    if (isAxiosError(error)) {
+      return error.response?.data || error.message;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
   }
 }
