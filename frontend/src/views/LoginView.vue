@@ -62,8 +62,8 @@ import { Ticket as TicketIcon, AlertCircle as AlertCircleIcon, Loader2 as Loader
 import { authService } from '../services/authService'
 
 const router = useRouter()
-const email = ref('admin@example.com')
-const password = ref('admin123')
+const email = ref('')
+const password = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 

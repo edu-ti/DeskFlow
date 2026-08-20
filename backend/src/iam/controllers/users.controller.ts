@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { IamService } from '../services/iam.service';
 import { User } from '../entities/user.entity';
+import { CreateUserDto } from '../dto/create-user.dto';
 import { RolesGuard } from '../guards/roles.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Roles } from '../decorators/roles.decorator';
@@ -17,7 +18,7 @@ export class UsersController {
   }
 
   @Post()
-  async create(@Body() data: Partial<User>) {
+  async create(@Body() data: CreateUserDto) {
     return this.iamService.createUser(data);
   }
 

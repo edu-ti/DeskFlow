@@ -1,9 +1,17 @@
 import { Injectable, ConflictException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { User } from '../entities/user.entity';
 import { Group } from '../entities/group.entity';
 import { Role } from '../entities/role.entity';
+
+type CreateUserInput = Omit<Partial<User>, 'roles' | 'groups'> & {
+  password?: string;
+  roles?: Array<{ id: number }>;
+  groups?: Array<{ id: number }>;
+};
 
 @Injectable()
 export class IamService implements OnModuleInit {
@@ -38,17 +46,18 @@ export class IamService implements OnModuleInit {
     }
   }
 
-  async createUser(data: Partial<User> & { password?: string }): Promise<User> {
+  async createUser(data: CreateUserInput): Promise<User> {
     const existing = await this.userRepository.findOne({ where: [{ email: data.email }, { login: data.login }] });
     if (existing) {
       throw new ConflictException('User with this email or login already exists');
     }
 
-    const userData: Partial<User> = { ...data };
-    userData.password_hash = data.password || '123456';
-    
-    const user = this.userRepository.create(userData);
-    // Em um sistema real, a senha (data.password) seria hasheada aqui antes de salvar
+    const { password, ...rest } = data;
+    const passwordToHash = password || randomBytes(16).toString('hex');
+    const user = this.userRepository.create({
+      ...rest,
+      password_hash: await bcrypt.hash(passwordToHash, 10),
+    });
     return this.userRepository.save(user);
   }
 
@@ -64,10 +73,14 @@ export class IamService implements OnModuleInit {
     return this.userRepository.find({ relations: { roles: true, groups: true, organization: true } });
   }
 
-  async updateUser(id: number, data: Partial<User>): Promise<User> {
+  async updateUser(id: number, data: Partial<User> & { password?: string }): Promise<User> {
     const user = await this.findUserById(id);
     if (!user) {
       throw new ConflictException('User not found');
+    }
+
+    if (data.password) {
+      user.password_hash = await bcrypt.hash(data.password, 10);
     }
     
     // Handle roles and groups relation updates
