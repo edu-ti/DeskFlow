@@ -106,6 +106,15 @@
           </div>
           
           <div class="flex items-center space-x-2">
+            <button
+              @click="callPanelRef?.startCall()"
+              class="flex items-center px-3 h-9 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-md transition-colors"
+              title="Ligar para o cliente via WhatsApp"
+            >
+              <PhoneIcon class="w-4 h-4 mr-1.5" />
+              Ligar
+            </button>
+
             <select v-model="selectedTicket.state_id" @change="changeStatus(selectedTicket.state_id)" class="text-sm border-gray-300 rounded-md focus:ring-df-primary focus:border-df-primary bg-white h-9">
               <option :value="1">Triagem</option>
               <option :value="2">Aberto</option>
@@ -444,6 +453,8 @@
         </button>
       </div>
     </div>
+    <!-- Call Panel (chamadas de voz WhatsApp) -->
+    <CallPanel v-if="selectedTicket" :ticket="selectedTicket" ref="callPanelRef" />
     <!-- Modais Customizados -->
     <!-- Modal: Alterar Assunto -->
     <div v-if="showSubjectModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -663,11 +674,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search as SearchIcon, MessageCircle as MessageCircleIcon, Send as SendIcon, Loader2 as Loader2Icon, ExternalLink as ExternalLinkIcon, CheckCheck as CheckCheckIcon, Zap as ZapIcon, Info as InfoIcon, File as FileIcon, Paperclip as PaperclipIcon, X as XIcon, Mic as MicIcon, Square as SquareIcon } from 'lucide-vue-next'
+import { Search as SearchIcon, MessageCircle as MessageCircleIcon, Send as SendIcon, Loader2 as Loader2Icon, ExternalLink as ExternalLinkIcon, CheckCheck as CheckCheckIcon, Zap as ZapIcon, Info as InfoIcon, File as FileIcon, Paperclip as PaperclipIcon, X as XIcon, Mic as MicIcon, Square as SquareIcon, Phone as PhoneIcon } from 'lucide-vue-next'
 import api from '@/services/api'
 import { iamService } from '@/services/iamService'
 import { socketService } from '@/services/socketService'
 import { useToast } from '@/composables/useToast'
+import CallPanel from '@/components/CallPanel.vue'
 
 const backendUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api$/, '') : 'http://localhost:3000'
 
@@ -800,6 +812,7 @@ const isLoadingMessages = ref(false)
 const newMessage = ref('')
 const isSending = ref(false)
 const showInfoSidebar = ref(false)
+const callPanelRef = ref<any>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)

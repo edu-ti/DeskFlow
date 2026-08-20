@@ -194,13 +194,18 @@ export class WhatsappCallingService {
           startedAt: call.start_time ? Number(call.start_time) * 1000 : Date.now(),
         };
         this.activeCalls.set(callId, state);
-        await this.saveLog(state);
 
         if (direction === 'BUSINESS_INITIATED') {
+          await this.saveLog(state);
           this.notificationsGateway.sendCallEvent('call_state', { callId, status: 'connected', sdp });
-        } else {
+        } else if (sdp) {
+          await this.saveLog(state);
           this.notificationsGateway.sendCallEvent('call_incoming', {
             callId, from, to, callerName, phoneId, sdp,
+          });
+        } else {
+          this.notificationsGateway.sendCallEvent('call_ringing', {
+            callId, from, to, callerName,
           });
         }
         return;
