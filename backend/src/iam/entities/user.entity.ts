@@ -32,6 +32,12 @@ export class User {
   @Column({ nullable: true })
   unit: string;
 
+  @Column({ type: 'text', nullable: true })
+  avatar_url: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  preferences: string | null;
+
   @Column({ default: true })
   is_active: boolean;
 

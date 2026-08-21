@@ -62,6 +62,12 @@ const router = createRouter({
           component: () => import('../views/admin/DashboardHomeView.vue'),
         },
         {
+          path: 'profile',
+          name: 'profile',
+          component: () => import('../views/ProfileView.vue'),
+          meta: { requiresAuth: true }
+        },
+        {
           path: '/omnichannel',
           name: 'omnichannel',
           component: () => import('../views/OmnichannelView.vue'),

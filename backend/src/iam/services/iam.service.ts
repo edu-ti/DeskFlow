@@ -103,6 +103,8 @@ export class IamService implements OnModuleInit {
       job_title: data.job_title ?? user.job_title,
       department: data.department ?? user.department,
       unit: data.unit ?? user.unit,
+      avatar_url: data.avatar_url !== undefined ? data.avatar_url : user.avatar_url,
+      preferences: data.preferences !== undefined ? data.preferences : user.preferences,
     });
     
     if (data.is_active !== undefined) {
@@ -114,6 +116,82 @@ export class IamService implements OnModuleInit {
 
   async deleteUser(id: number): Promise<void> {
     await this.userRepository.delete(id);
+  }
+
+  // --- PERFIL DO USUÁRIO ---
+  async getProfile(userId: number): Promise<Omit<User, 'password_hash'>> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: { roles: true, groups: true, organization: true },
+    });
+    if (!user) throw new ConflictException('Usuário não encontrado');
+    const { password_hash, ...rest } = user;
+    return rest as any;
+  }
+
+  async updateProfile(
+    userId: number,
+    data: {
+      firstname?: string;
+      lastname?: string;
+      email?: string;
+      phone?: string;
+      job_title?: string;
+      department?: string;
+      unit?: string;
+      avatar_url?: string | null;
+      preferences?: string | null;
+    },
+  ): Promise<Omit<User, 'password_hash'>> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: { roles: true, groups: true, organization: true },
+    });
+    if (!user) throw new ConflictException('Usuário não encontrado');
+
+    if (data.email && data.email !== user.email) {
+      const existing = await this.userRepository.findOne({ where: { email: data.email } });
+      if (existing && existing.id !== userId) {
+        throw new ConflictException('Este e-mail já está sendo utilizado por outro usuário');
+      }
+      user.email = data.email;
+    }
+
+    if (data.firstname !== undefined) user.firstname = data.firstname;
+    if (data.lastname !== undefined) user.lastname = data.lastname;
+    if (data.phone !== undefined) user.phone = data.phone;
+    if (data.job_title !== undefined) user.job_title = data.job_title;
+    if (data.department !== undefined) user.department = data.department;
+    if (data.unit !== undefined) user.unit = data.unit;
+    if (data.avatar_url !== undefined) user.avatar_url = data.avatar_url;
+    if (data.preferences !== undefined) user.preferences = data.preferences;
+
+    const saved = await this.userRepository.save(user);
+    const { password_hash, ...rest } = saved;
+    return rest as any;
+  }
+
+  async changePassword(
+    userId: number,
+    currentPass: string,
+    newPass: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new ConflictException('Usuário não encontrado');
+
+    const isValid = await bcrypt.compare(currentPass, user.password_hash);
+    if (!isValid) {
+      throw new ConflictException('A senha atual informada está incorreta.');
+    }
+
+    if (!newPass || newPass.length < 6) {
+      throw new ConflictException('A nova senha deve ter no mínimo 6 caracteres.');
+    }
+
+    user.password_hash = await bcrypt.hash(newPass, 10);
+    await this.userRepository.save(user);
+
+    return { success: true, message: 'Senha atualizada com sucesso!' };
   }
 
   // --- GROUPS ---

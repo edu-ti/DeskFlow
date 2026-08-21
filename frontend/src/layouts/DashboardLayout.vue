@@ -230,16 +230,26 @@
         </template>
       </nav>
 
-      <div class="p-4 border-t border-white/10">
-        <div class="flex items-center transition-all duration-300" :class="isSidebarCollapsed ? 'flex-col gap-4' : 'gap-3'">
-          <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-df-primary to-df-accent flex items-center justify-center text-white font-bold text-sm shadow-lg flex-shrink-0">
-            {{ userName.substring(0,2).toUpperCase() }}
-          </div>
-          <div v-if="!isSidebarCollapsed" class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-white truncate">{{ userName }}</p>
-            <p class="text-xs text-gray-400 truncate">{{ isAdmin ? 'Administrador' : 'Agente' }}</p>
-          </div>
-          <button @click="logout" class="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-colors flex-shrink-0" title="Sair">
+      <div class="p-3 border-t border-white/10">
+        <div class="flex items-center transition-all duration-300" :class="isSidebarCollapsed ? 'flex-col gap-3' : 'gap-2'">
+          <router-link
+            to="/profile"
+            class="flex items-center gap-3 flex-1 min-w-0 p-1.5 rounded-xl hover:bg-white/10 transition-colors group cursor-pointer"
+            :class="isSidebarCollapsed ? 'justify-center' : ''"
+            title="Meu Perfil (Configurar foto, dados e senha)"
+          >
+            <div
+              class="w-9 h-9 rounded-full bg-gradient-to-tr from-df-primary to-df-accent flex items-center justify-center text-white font-bold text-sm shadow-lg flex-shrink-0 bg-cover bg-center overflow-hidden border border-white/20"
+              :style="userAvatar ? { backgroundImage: `url(${userAvatar})` } : {}"
+            >
+              <span v-if="!userAvatar">{{ userInitials }}</span>
+            </div>
+            <div v-if="!isSidebarCollapsed" class="flex-1 min-w-0 text-left">
+              <p class="text-sm font-medium text-white truncate group-hover:text-df-accent transition-colors">{{ userName }}</p>
+              <p class="text-xs text-gray-400 truncate">{{ isAdmin ? 'Administrador' : 'Agente' }}</p>
+            </div>
+          </router-link>
+          <button @click="logout" class="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0" title="Sair do Sistema">
             <LogOutIcon class="w-4 h-4" />
           </button>
         </div>
@@ -372,6 +382,8 @@ const router = useRouter()
 const route = useRoute()
 const isAdmin = ref(false)
 const userName = ref('')
+const userAvatar = ref<string | null>(null)
+const userInitials = ref('AD')
 const isSidebarOpen = ref(false)
 const isSidebarCollapsed = ref(false)
 
@@ -383,23 +395,32 @@ watch(() => route.path, () => {
 const notificationsStore = useNotificationsStore()
 const showNotifications = ref(false)
 
-onMounted(() => {
+const loadUserData = () => {
   const userStr = localStorage.getItem('user')
   if (userStr) {
     try {
       const user = JSON.parse(userStr)
-      userName.value = user.firstname || user.email
-      if (user.roles && user.roles.includes('admin')) {
+      userName.value = user.firstname ? `${user.firstname} ${user.lastname || ''}`.trim() : (user.email || 'Usuário')
+      const f = user.firstname || 'A'
+      const l = user.lastname || 'D'
+      userInitials.value = `${f[0] || ''}${l[0] || ''}`.toUpperCase()
+      userAvatar.value = user.avatar_url || null
+      if (user.roles && (user.roles.includes('admin') || user.roles.some((r: any) => r.name === 'admin' || r === 'admin'))) {
         isAdmin.value = true
       }
     } catch(e) {}
   }
-  
+}
+
+onMounted(() => {
+  loadUserData()
+  window.addEventListener('user-profile-updated', loadUserData)
   socketService.connect()
   notificationsStore.fetchNotifications()
 })
 
 onUnmounted(() => {
+  window.removeEventListener('user-profile-updated', loadUserData)
   socketService.disconnect()
 })
 
