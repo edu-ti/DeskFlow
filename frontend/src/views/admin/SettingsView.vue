@@ -139,6 +139,38 @@
               <input v-model="settings.whatsapp_verify_token" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="deskflow_whatsapp_2026">
             </div>
           </div>
+
+          <div class="border-t border-gray-100 pt-4">
+            <h3 class="text-sm font-semibold text-gray-800 mb-3">Chamadas de Voz — Política (LGPD / Retenção)</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Exigir consentimento (LGPD)</label>
+                <select v-model="settings.calling_require_consent" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                  <option value="true">Sim — bloquear chamada de saída sem consentimento</option>
+                  <option value="false">Não — apenas permissão da WhatsApp</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Chamadas de saída por agente / 24h</label>
+                <input v-model="settings.calling_max_calls_per_day_per_agent" type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Chamadas simultâneas (máx.)</label>
+                <input v-model="settings.calling_max_concurrent_calls" type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Retenção dos logs (dias)</label>
+                <input v-model="settings.calling_log_retention_days" type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Anonimizar dados sensíveis (dias)</label>
+                <input v-model="settings.calling_log_anonymize_days" type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-2">
+              A purga automática roda a cada 6h. Chamadas de saída exigem consentimento do cliente (LGPD) e permissão da WhatsApp (limite ≥ 2000 mensagens).
+            </p>
+          </div>
         </div>
       </div>
 
@@ -209,6 +241,11 @@ const settings = ref<Record<string, string>>({
   whatsapp_token: '',
   whatsapp_phone_id: '',
   whatsapp_verify_token: 'deskflow_whatsapp_2026',
+  calling_require_consent: 'true',
+  calling_max_calls_per_day_per_agent: '50',
+  calling_max_concurrent_calls: '5',
+  calling_log_retention_days: '90',
+  calling_log_anonymize_days: '30',
   OPENAI_API_KEY: '',
   AI_MODEL: 'gpt-4o-mini',
   AI_BOT_ENABLED: 'true'
@@ -239,7 +276,7 @@ const saveSettings = async () => {
   isSaving.value = true
   try {
     await api.put('/settings', settings.value)
-    toastSuccess('Sucesso', 'Configurações de e-mail atualizadas. Elas entrarão em vigor no próximo ciclo (até 5 min).')
+    toastSuccess('Sucesso', 'Configurações atualizadas com sucesso.')
   } catch (error) {
     toastError('Erro', 'Não foi possível salvar as configurações.')
   } finally {

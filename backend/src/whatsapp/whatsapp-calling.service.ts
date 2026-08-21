@@ -1,10 +1,12 @@
-import { Injectable, Logger, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThan, MoreThan } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { SettingsService } from '../settings/services/settings.service';
 import { CtiLog } from '../cti/entities/cti-log.entity';
+import { AuditLog } from '../audit/entities/audit-log.entity';
+import { AuditService } from '../audit/services/audit.service';
 import { WhatsappService } from './whatsapp.service';
 import { NotificationsGateway } from '../notifications/gateway/notifications.gateway';
 import { UpdateCallSettingsDto } from './dto/update-call-settings.dto';
@@ -26,6 +28,20 @@ export interface CallState {
   startedAt?: number;
 }
 
+export interface ConsentEntry {
+  grantedAt: string;
+  method?: string;
+  by?: number;
+}
+
+interface CallingPolicy {
+  requireConsent: boolean;
+  maxCallsPerAgentPerDay: number;
+  maxConcurrentCalls: number;
+  retentionDays: number;
+  anonymizeDays: number;
+}
+
 @Injectable()
 export class WhatsappCallingService {
   private readonly logger = new Logger(WhatsappCallingService.name);
@@ -37,9 +53,12 @@ export class WhatsappCallingService {
     private readonly settingsService: SettingsService,
     @InjectRepository(CtiLog)
     private readonly ctiLogRepository: Repository<CtiLog>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepository: Repository<AuditLog>,
     @Inject(forwardRef(() => WhatsappService))
     private readonly whatsappService: WhatsappService,
     private readonly notificationsGateway: NotificationsGateway,
+    private readonly auditService: AuditService,
   ) {}
 
   private async getConfig(): Promise<{ token: string; phoneId: string }> {
@@ -53,6 +72,36 @@ export class WhatsappCallingService {
     return { token, phoneId };
   }
 
+  private async getPolicy(): Promise<CallingPolicy> {
+    const [requireConsent, maxPerDay, maxConcurrent, retentionDays, anonymizeDays] = await Promise.all([
+      this.settingsService.getSetting('calling_require_consent', 'true'),
+      this.settingsService.getSetting('calling_max_calls_per_day_per_agent', '50'),
+      this.settingsService.getSetting('calling_max_concurrent_calls', '5'),
+      this.settingsService.getSetting('calling_log_retention_days', '90'),
+      this.settingsService.getSetting('calling_log_anonymize_days', '30'),
+    ]);
+    return {
+      requireConsent: requireConsent !== 'false',
+      maxCallsPerAgentPerDay: Math.max(1, parseInt(maxPerDay || '50', 10) || 50),
+      maxConcurrentCalls: Math.max(1, parseInt(maxConcurrent || '5', 10) || 5),
+      retentionDays: Math.max(1, parseInt(retentionDays || '90', 10) || 90),
+      anonymizeDays: Math.max(1, parseInt(anonymizeDays || '30', 10) || 30),
+    };
+  }
+
+  private async getConsentMap(): Promise<Record<string, ConsentEntry>> {
+    const raw = await this.settingsService.getSetting('calling_consents', '{}');
+    try {
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private async saveConsentMap(map: Record<string, ConsentEntry>): Promise<void> {
+    await this.settingsService.updateSettings({ calling_consents: JSON.stringify(map) });
+  }
+
   // ---------------------------------------------------------------------------
   // Configuração / elegibilidade (Fase 1)
   // ---------------------------------------------------------------------------
@@ -60,11 +109,10 @@ export class WhatsappCallingService {
   private isEligibleTier(tier?: string): boolean {
     if (!tier) return false;
     if (tier === 'TIER_1K') return false;
-    // TIER_10K+ possuem limite ≥ 2000, requisito para chamadas iniciadas pela empresa
     return /^TIER_(10K|50K|100K|250K|UNLIMITED)$/.test(tier);
   }
 
-  async getCallingEligibility() {
+  async getCallingEligibility(userId: number, req?: any) {
     const { token, phoneId } = await this.getConfig();
     const url = `${GRAPH_API_BASE}/${phoneId}?fields=messaging_limit_tier,quality_rating,throughput,display_phone_number,verified_name`;
     const resp = await firstValueFrom(
@@ -72,6 +120,17 @@ export class WhatsappCallingService {
     );
     const tier = resp.data.messaging_limit_tier as string | undefined;
     const eligible = this.isEligibleTier(tier);
+
+    await this.auditService.logAction(
+      userId,
+      'CALL_ELIGIBILITY_CHECK',
+      'call',
+      phoneId,
+      undefined,
+      { tier, eligible },
+      `Verificação de elegibilidade de chamadas (tier=${tier || 'UNKNOWN'})`,
+      req,
+    );
 
     return {
       eligible,
@@ -102,7 +161,7 @@ export class WhatsappCallingService {
     }
   }
 
-  async updateCallSettings(dto: UpdateCallSettingsDto) {
+  async updateCallSettings(dto: UpdateCallSettingsDto, userId: number, req?: any) {
     const { token, phoneId } = await this.getConfig();
 
     if (
@@ -132,6 +191,16 @@ export class WhatsappCallingService {
     );
 
     await this.saveLocal(calling);
+    await this.auditService.logAction(
+      userId,
+      'CALL_SETTINGS_UPDATE',
+      'call',
+      phoneId,
+      undefined,
+      calling,
+      `Atualização das configurações de chamadas na Meta (status=${dto.status})`,
+      req,
+    );
     this.logger.log(`Call settings atualizadas na Meta: status=${dto.status}`);
     return { success: true, calling, meta: resp.data };
   }
@@ -159,6 +228,187 @@ export class WhatsappCallingService {
       call_hours: hours ? JSON.parse(hours) : null,
       source: 'local',
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Consentimento LGPD (Fase 4)
+  // ---------------------------------------------------------------------------
+
+  async recordConsent(dto: { user_wa_id: string; method?: string }, userId: number, req?: any) {
+    const waId = dto.user_wa_id.replace(/\D/g, '');
+    if (!waId) throw new BadRequestException('user_wa_id é obrigatório.');
+
+    const map = await this.getConsentMap();
+    map[waId] = { grantedAt: new Date().toISOString(), method: dto.method || 'manual', by: userId };
+    await this.saveConsentMap(map);
+
+    await this.auditService.logAction(
+      userId,
+      'CALL_CONSENT_GRANT',
+      'call',
+      waId,
+      undefined,
+      { method: dto.method || 'manual' },
+      `Consentimento para chamadas de voz registrado para o WhatsApp ${waId} (LGPD).`,
+      req,
+    );
+
+    return {
+      success: true,
+      message: 'Consentimento registrado com sucesso. O cliente poderá receber chamadas de voz.',
+      wa_id: waId,
+      granted_at: map[waId].grantedAt,
+    };
+  }
+
+  async getConsent(userWaId: string, userId: number, req?: any) {
+    const waId = userWaId.replace(/\D/g, '');
+    if (!waId) throw new BadRequestException('user_wa_id é obrigatório.');
+
+    const map = await this.getConsentMap();
+    const local = map[waId] || null;
+
+    let metaPermission: any = null;
+    try {
+      metaPermission = await this.getMetaCallPermission(waId);
+    } catch (e) {
+      this.logger.warn(`Falha ao consultar permissão de chamada na Meta para ${waId}: ${(e as Error).message}`);
+    }
+
+    await this.auditService.logAction(
+      userId,
+      'CALL_PERMISSION_CHECK',
+      'call',
+      waId,
+      undefined,
+      { consent: local ? 'granted' : 'none', meta: metaPermission },
+      `Verificação de consentimento/permissão de chamada para o WhatsApp ${waId}.`,
+      req,
+    );
+
+    return {
+      wa_id: waId,
+      consent: local,
+      granted: !!local,
+      meta_permission: metaPermission,
+      allowed: !!local && !!metaPermission,
+    };
+  }
+
+  async revokeConsent(userWaId: string, userId: number, req?: any) {
+    const waId = userWaId.replace(/\D/g, '');
+    const map = await this.getConsentMap();
+    if (!map[waId]) throw new NotFoundException('Consentimento não encontrado para este WhatsApp.');
+
+    delete map[waId];
+    await this.saveConsentMap(map);
+
+    await this.auditService.logAction(
+      userId,
+      'CALL_CONSENT_REVOKE',
+      'call',
+      waId,
+      { grantedAt: undefined },
+      { status: 'REVOKED' },
+      `Consentimento para chamadas de voz revogado para o WhatsApp ${waId} (LGPD - direito de objeção).`,
+      req,
+    );
+
+    return { success: true, message: 'Consentimento revogado. Chamadas de saída para este número foram bloqueadas.' };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Gerenciamento de logs (Fase 4)
+  // ---------------------------------------------------------------------------
+
+  async listLogs(query: { page?: number; limit?: number; ticket_id?: number }, userId: number, req?: any) {
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(100, Math.max(1, query.limit || 20));
+    const qb = this.ctiLogRepository
+      .createQueryBuilder('log')
+      .orderBy('log.created_at', 'DESC');
+
+    if (query.ticket_id) {
+      qb.andWhere('log.ticket_id = :ticket_id', { ticket_id: query.ticket_id });
+    }
+
+    const [items, total] = await qb.skip((page - 1) * limit).take(limit).getManyAndCount();
+
+    await this.auditService.logAction(
+      userId,
+      'CALL_LOGS_VIEW',
+      'call',
+      undefined,
+      undefined,
+      { page, limit, total },
+      'Consulta aos registros de chamadas (logs do sistema de telefonia).',
+      req,
+    );
+
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async deleteLog(id: number, userId: number, req?: any) {
+    const log = await this.ctiLogRepository.findOne({ where: { id } });
+    if (!log) throw new NotFoundException('Registro de chamada não encontrado.');
+
+    await this.ctiLogRepository.delete(id);
+
+    await this.auditService.logAction(
+      userId,
+      'CALL_LOG_ERASE',
+      'call',
+      id,
+      { call_id: log.call_id, from: log.from, to: log.to },
+      { status: 'ERASED' },
+      `Registro de chamada #${id} apagado conforme LGPD (direito ao apagamento).`,
+      req,
+    );
+
+    return { success: true, message: 'Registro de chamada apagado.' };
+  }
+
+  async purgeExpiredLogs(): Promise<{ deleted: number; anonymized: number }> {
+    const policy = await this.getPolicy();
+    const now = new Date();
+
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() - policy.retentionDays);
+    const anonymizeCutoff = new Date(now);
+    anonymizeCutoff.setDate(anonymizeCutoff.getDate() - policy.anonymizeDays);
+
+    const expired = await this.ctiLogRepository.find({ where: { created_at: LessThan(cutoff) } });
+    if (expired.length > 0) {
+      await this.ctiLogRepository.remove(expired);
+    }
+
+    const toAnonymize = await this.ctiLogRepository.find({
+      where: { created_at: LessThan(anonymizeCutoff) },
+    });
+    let anonymized = 0;
+    for (const log of toAnonymize) {
+      if (log.caller_name || log.sdp) {
+        log.caller_name = null;
+        log.sdp = null;
+        await this.ctiLogRepository.save(log);
+        anonymized++;
+      }
+    }
+
+    if (expired.length > 0 || anonymized > 0) {
+      await this.auditService.logAction(
+        null,
+        'CALL_PURGE',
+        'call',
+        undefined,
+        undefined,
+        { deleted: expired.length, anonymized },
+        `Retenção de logs de chamadas: ${expired.length} excluídos (> ${policy.retentionDays} dias) e ${anonymized} anonimizados (> ${policy.anonymizeDays} dias).`,
+      );
+      this.logger.log(`Purge de logs de chamadas: ${expired.length} excluídos, ${anonymized} anonimizados`);
+    }
+
+    return { deleted: expired.length, anonymized };
   }
 
   // ---------------------------------------------------------------------------
@@ -197,9 +447,27 @@ export class WhatsappCallingService {
 
         if (direction === 'BUSINESS_INITIATED') {
           await this.saveLog(state);
+          await this.auditService.logAction(
+            null,
+            'CALL_CONNECTED',
+            'call',
+            callId,
+            undefined,
+            { direction, from, to },
+            `Chamada de saída conectada (${from} → ${to}).`,
+          );
           this.notificationsGateway.sendCallEvent('call_state', { callId, status: 'connected', sdp });
         } else if (sdp) {
           await this.saveLog(state);
+          await this.auditService.logAction(
+            null,
+            'CALL_RECEIVED',
+            'call',
+            callId,
+            undefined,
+            { from, to, callerName },
+            `Chamada de voz recebida de ${callerName || from}.`,
+          );
           this.notificationsGateway.sendCallEvent('call_incoming', {
             callId, from, to, callerName, phoneId, sdp,
           });
@@ -231,6 +499,15 @@ export class WhatsappCallingService {
         };
         this.activeCalls.delete(callId);
         await this.finalizeLog(state, callDuration, finalStatus);
+        await this.auditService.logAction(
+          null,
+          'CALL_FINALIZED',
+          'call',
+          callId,
+          undefined,
+          { status: finalStatus, duration: callDuration ?? null },
+          `Chamada finalizada (${finalStatus}${callDuration ? `, ${callDuration}s` : ''}).`,
+        );
         this.notificationsGateway.sendCallEvent('call_terminated', {
           callId, from, to, status: finalStatus, duration: callDuration ?? null,
         });
@@ -240,8 +517,61 @@ export class WhatsappCallingService {
     }
   }
 
-  async initiateCall(dto: InitiateCallDto) {
+  async initiateCall(dto: InitiateCallDto, userId: number, req?: any) {
     const { token, phoneId } = await this.getConfig();
+    const policy = await this.getPolicy();
+
+    // Limite de chamadas simultâneas
+    if (this.activeCalls.size >= policy.maxConcurrentCalls) {
+      throw new ForbiddenException(
+        `Limite de chamadas simultâneas atingido (${policy.maxConcurrentCalls}). Aguarde a conclusão de uma chamada ativa.`,
+      );
+    }
+
+    // Limite diário por agente
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const agentToday = await this.auditLogRepository.count({
+      where: {
+        action: 'CALL_INITIATE',
+        user_id: userId,
+        created_at: MoreThan(since24h),
+      },
+    });
+    if (agentToday >= policy.maxCallsPerAgentPerDay) {
+      throw new ForbiddenException(
+        `Limite diário de chamadas de saída atingido (${policy.maxCallsPerAgentPerDay} nas últimas 24h). Tente novamente amanhã.`,
+      );
+    }
+
+    // Consentimento LGPD
+    const waId = dto.to.replace(/\D/g, '');
+    const consentMap = await this.getConsentMap();
+    const hasConsent = !!consentMap[waId];
+    if (policy.requireConsent && !hasConsent) {
+      throw new ForbiddenException(
+        'Consentimento obrigatório (LGPD): registre o consentimento do cliente antes de iniciar a chamada (use o endpoint de consentimento ou solicite a autorização via mensagem).',
+      );
+    }
+
+    // Permissão da Meta
+    let metaAllowed = true;
+    try {
+      const permission = await this.getMetaCallPermission(waId);
+      metaAllowed = permission?.allow_call !== false;
+    } catch (e) {
+      if (policy.requireConsent) {
+        throw new BadRequestException(
+          `Não foi possível verificar a permissão de chamada na Meta para ${waId}: ${(e as Error).message}`,
+        );
+      }
+      metaAllowed = false;
+    }
+    if (!metaAllowed) {
+      throw new ForbiddenException(
+        'O cliente ainda não concedeu permissão para chamadas de voz na WhatsApp. Envie uma mensagem solicitando autorização e aguarde a aprovação antes de ligar.',
+      );
+    }
+
     const body: Record<string, unknown> = {
       messaging_product: 'whatsapp',
       to: dto.to,
@@ -269,11 +599,23 @@ export class WhatsappCallingService {
         startedAt: Date.now(),
       });
     }
+
+    await this.auditService.logAction(
+      userId,
+      'CALL_INITIATE',
+      'call',
+      callId || waId,
+      undefined,
+      { to: dto.to, consent: hasConsent, concurrent_active: this.activeCalls.size },
+      `Chamada de voz de saída iniciada para ${dto.to} (callId=${callId || 'n/a'}).`,
+      req,
+    );
+
     this.logger.log(`Chamada de saída iniciada para ${dto.to} (callId=${callId || 'n/a'})`);
     return { success: !!callId, callId, meta: resp.data };
   }
 
-  async callAction(dto: CallActionDto) {
+  async callAction(dto: CallActionDto, userId: number, req?: any) {
     const { token, phoneId } = await this.getConfig();
     const action = dto.action as CallAction;
     const body: Record<string, unknown> = {
@@ -294,11 +636,23 @@ export class WhatsappCallingService {
       prev.status = action;
       this.activeCalls.set(dto.callId, prev);
     }
+
+    await this.auditService.logAction(
+      userId,
+      'CALL_ACTION',
+      'call',
+      dto.callId,
+      undefined,
+      { action },
+      `Ação ${action.toUpperCase()} executada na chamada ${dto.callId}.`,
+      req,
+    );
+
     this.logger.log(`Ação de chamada executada: ${action} (callId=${dto.callId})`);
     return { success: true, meta: resp.data };
   }
 
-  async getCallPermission(userWaId: string) {
+  private async getMetaCallPermission(userWaId: string) {
     const { token, phoneId } = await this.getConfig();
     const url = `${GRAPH_API_BASE}/${phoneId}/call_permissions?user_wa_id=${encodeURIComponent(userWaId)}`;
     const resp = await firstValueFrom(

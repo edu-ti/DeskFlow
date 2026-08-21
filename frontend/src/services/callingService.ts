@@ -47,6 +47,36 @@ class CallingService {
     const res = await api.put('/whatsapp/calling/settings', dto);
     return res.data;
   }
+
+  async getConsent(userWaId: string) {
+    const res = await api.get(`/whatsapp/calling/consent/${encodeURIComponent(userWaId)}`);
+    return res.data;
+  }
+
+  async recordConsent(dto: { user_wa_id: string; method?: string }) {
+    const res = await api.post('/whatsapp/calling/consent', dto);
+    return res.data;
+  }
+
+  async revokeConsent(userWaId: string) {
+    const res = await api.delete(`/whatsapp/calling/consent/${encodeURIComponent(userWaId)}`);
+    return res.data;
+  }
+
+  async listLogs(query: { page?: number; limit?: number; ticket_id?: number } = {}) {
+    const res = await api.get('/whatsapp/calling/logs', { params: query });
+    return res.data;
+  }
+
+  async deleteLog(id: number) {
+    const res = await api.delete(`/whatsapp/calling/logs/${id}`);
+    return res.data;
+  }
+
+  async purgeLogs() {
+    const res = await api.post('/whatsapp/calling/maintenance/purge');
+    return res.data;
+  }
 }
 
 export const callingService = new CallingService();

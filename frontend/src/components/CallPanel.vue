@@ -2,6 +2,48 @@
   <div>
     <audio ref="remoteAudioRef" autoplay class="hidden"></audio>
 
+    <!-- Consentimento LGPD -->
+    <div v-if="showConsentModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <ShieldCheckIcon class="w-6 h-6 text-emerald-600" />
+            <h3 class="text-base font-bold text-gray-900">Consentimento obrigatório</h3>
+          </div>
+          <button @click="showConsentModal = false" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+            <XIcon class="w-5 h-5" />
+          </button>
+        </div>
+        <p class="text-sm text-gray-600 mb-2">
+          Para ligar para <strong>{{ formatPhone(consentPhone) }}</strong>, o cliente precisa ter autorizado chamadas de voz (LGPD).
+        </p>
+        <p class="text-xs text-gray-500 mb-4">
+          Confirme que o cliente manifestou interesse em receber chamadas (por mensagem ou verbalmente) antes de registrar o consentimento.
+        </p>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Método do consentimento</label>
+          <select v-model="consentMethod" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+            <option value="message_opt_in">Opt-in por mensagem</option>
+            <option value="callback_request">Solicitação de retorno (callback)</option>
+            <option value="manual">Verbal / presencial</option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-2.5 pt-2 border-t border-gray-100">
+          <button @click="showConsentModal = false" class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+            Cancelar
+          </button>
+          <button
+            @click="confirmConsentAndCall"
+            :disabled="isRecordingConsent"
+            class="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            <Loader2Icon v-if="isRecordingConsent" class="w-4 h-4 animate-spin" />
+            <span>{{ isRecordingConsent ? 'Registrando...' : 'Registrar consentimento e ligar' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Incoming call overlay -->
     <div
       v-if="incomingCall"
@@ -97,7 +139,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming as PhoneIncomingIcon, PhoneOutgoing as PhoneOutgoingIcon, Mic as MicIcon, MicOff as MicOffIcon, X as XIcon } from 'lucide-vue-next'
+import { Phone as PhoneIcon, PhoneOff as PhoneOffIcon, PhoneIncoming as PhoneIncomingIcon, PhoneOutgoing as PhoneOutgoingIcon, Mic as MicIcon, MicOff as MicOffIcon, X as XIcon, ShieldCheck as ShieldCheckIcon, Loader2 as Loader2Icon } from 'lucide-vue-next'
 import { socketService } from '@/services/socketService'
 import { callingService } from '@/services/callingService'
 import { useToast } from '@/composables/useToast'
@@ -130,6 +172,11 @@ const incomingCall = ref<IncomingCall | null>(null)
 const activeCall = ref<ActiveCall | null>(null)
 const isBusy = ref(false)
 const elapsed = ref(0)
+
+const showConsentModal = ref(false)
+const consentPhone = ref('')
+const consentMethod = ref('message_opt_in')
+const isRecordingConsent = ref(false)
 
 const remoteAudioRef = ref<HTMLAudioElement | null>(null)
 
@@ -244,6 +291,48 @@ const startCall = async (phoneOverride?: string) => {
     toastError('Ocupado', 'Já existe uma chamada ativa.')
     return
   }
+  isBusy.value = true
+  try {
+    const consent = await callingService.getConsent(phone)
+    if (!consent.granted) {
+      consentPhone.value = phone
+      consentMethod.value = 'message_opt_in'
+      showConsentModal.value = true
+      return
+    }
+    if (consent.allowed) {
+      await doStartCall(phone)
+      return
+    }
+    if (consent.meta_permission === null) {
+      toastError('Indisponível', 'Não foi possível confirmar a permissão com a WhatsApp. Verifique a configuração (whatsapp_token/whatsapp_phone_id).')
+      return
+    }
+    toastError('Sem permissão', 'O cliente ainda não autorizou chamadas na WhatsApp. Envie uma mensagem solicitando autorização e aguarde a aprovação.')
+  } catch (err: any) {
+    toastError('Erro', err?.response?.data?.message || 'Não foi possível verificar a permissão de chamada.')
+  } finally {
+    isBusy.value = false
+  }
+}
+
+const confirmConsentAndCall = async () => {
+  const phone = consentPhone.value
+  if (!phone) return
+  isRecordingConsent.value = true
+  try {
+    await callingService.recordConsent({ user_wa_id: phone, method: consentMethod.value })
+    toastSuccess('Consentimento', 'Consentimento registrado (LGPD).')
+    showConsentModal.value = false
+    await doStartCall(phone)
+  } catch (err: any) {
+    toastError('Erro', err?.response?.data?.message || 'Falha ao registrar o consentimento.')
+  } finally {
+    isRecordingConsent.value = false
+  }
+}
+
+const doStartCall = async (phone: string) => {
   isBusy.value = true
   try {
     const stream = await getLocalStream()
