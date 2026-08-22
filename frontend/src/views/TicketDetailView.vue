@@ -1,61 +1,113 @@
 <template>
-  <div class="max-w-6xl mx-auto lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-6 pb-6 lg:pb-0">
-    <!-- Left Column: Ticket Info -->
-    <div class="w-full lg:w-1/3 flex flex-col gap-6 lg:h-full lg:overflow-y-auto lg:pr-2 custom-scrollbar shrink-0">
+  <div class="max-w-7xl mx-auto lg:h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-6 pb-6 lg:pb-0">
+    <!-- Left Column: Ticket Info & SLA Dashboard -->
+    <div class="w-full lg:w-1/3 flex flex-col gap-5 lg:h-full lg:overflow-y-auto lg:pr-2 custom-scrollbar shrink-0">
       <div v-if="isLoading" class="bg-white border border-gray-200 shadow-sm p-6 rounded-2xl flex justify-center">
         <Loader2Icon class="w-6 h-6 text-df-primary animate-spin" />
       </div>
       
-      <div v-else-if="ticket" class="bg-white border border-gray-200 shadow-sm p-6 rounded-2xl">
-        <div class="flex items-center gap-3 mb-4">
-          <h1 class="text-xl font-bold text-gray-800 flex-1">#{{ ticket.id }}</h1>
+      <div v-else-if="ticket" class="bg-white border border-gray-200 shadow-sm p-6 rounded-2xl space-y-5">
+        <!-- Header Status & Service Type -->
+        <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-4">
+          <div>
+            <span class="text-xs font-mono font-bold text-gray-400">TICKET</span>
+            <h1 class="text-xl font-extrabold text-gray-900">#{{ ticket.id }}</h1>
+          </div>
           
-          <select 
-            v-if="isAdminOrAgent" 
-            v-model="ticket.state_id" 
-            @change="updateState"
-            class="px-2.5 py-1 bg-df-accent/20 text-df-accent border border-df-accent/30 rounded-full text-xs font-medium focus:outline-none focus:ring-1 focus:ring-df-accent appearance-none cursor-pointer"
-          >
-            <option :value="1">Novo</option>
-            <option :value="2">Aberto</option>
-            <option :value="3">Pendente</option>
-            <option :value="4">Resolvido</option>
-            <option :value="5">Fechado</option>
-          </select>
-          <span v-else class="px-2.5 py-1 bg-df-accent/20 text-df-accent rounded-full text-xs font-medium">
-            {{ getStatusName(ticket.state_id) }}
-          </span>
+          <div class="flex items-center gap-2">
+            <select 
+              v-if="isAdminOrAgent" 
+              v-model="ticket.state_id" 
+              @change="updateState"
+              class="px-3 py-1.5 bg-blue-50 text-df-primary border border-blue-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-df-primary/20 appearance-none cursor-pointer"
+            >
+              <option :value="1">Novo</option>
+              <option :value="2">Aberto</option>
+              <option :value="3">Pendente</option>
+              <option :value="4">Resolvido</option>
+              <option :value="5">Fechado</option>
+            </select>
+            <span v-else class="px-3 py-1.5 bg-blue-50 text-df-primary border border-blue-200 rounded-xl text-xs font-bold">
+              {{ getStatusName(ticket.state_id) }}
+            </span>
+          </div>
         </div>
         
-        <h2 class="text-lg text-gray-800 font-medium mb-6">{{ ticket.title }}</h2>
+        <h2 class="text-base text-gray-900 font-bold leading-snug">{{ ticket.title }}</h2>
 
-        <div class="space-y-4">
+        <!-- Modalidade de Atendimento: Remoto vs Presencial -->
+        <div class="p-3 bg-gray-50 border border-gray-200/80 rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Modalidade do Atendimento</label>
+            <span :class="ticket.service_type === 'onsite' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-100 text-blue-800 border-blue-200'" class="px-2 py-0.5 rounded-md text-[10px] font-bold border uppercase tracking-wider">
+              {{ ticket.service_type === 'onsite' ? 'Presencial' : 'Remoto' }}
+            </span>
+          </div>
+          
+          <div v-if="isAdminOrAgent" class="grid grid-cols-2 gap-2">
+            <button 
+              type="button" 
+              @click="setServiceType('remote')" 
+              :class="ticket.service_type !== 'onsite' ? 'bg-white text-df-primary font-bold shadow-xs border-df-primary/40' : 'bg-transparent text-gray-500 hover:bg-gray-100 border-transparent'"
+              class="py-1.5 px-3 text-xs rounded-lg border transition-all flex items-center justify-center gap-1.5"
+            >
+              <MonitorIcon class="w-3.5 h-3.5" />
+              <span>Remoto (4h)</span>
+            </button>
+            <button 
+              type="button" 
+              @click="setServiceType('onsite')" 
+              :class="ticket.service_type === 'onsite' ? 'bg-white text-amber-700 font-bold shadow-xs border-amber-300' : 'bg-transparent text-gray-500 hover:bg-gray-100 border-transparent'"
+              class="py-1.5 px-3 text-xs rounded-lg border transition-all flex items-center justify-center gap-1.5"
+            >
+              <MapPinIcon class="w-3.5 h-3.5" />
+              <span>Presencial (8h)</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-4 text-sm">
+          <!-- Cliente & Empresa -->
           <div>
-            <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">Cliente</label>
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-df-primary/20 flex items-center justify-center text-df-primary font-bold text-sm">
+            <label class="text-xs text-gray-500 font-semibold uppercase tracking-wider block mb-1.5">Cliente & Empresa</label>
+            <div class="flex items-start gap-3 p-3 bg-gray-50/60 rounded-xl border border-gray-200/60">
+              <div class="w-9 h-9 rounded-xl bg-df-primary/15 flex items-center justify-center text-df-primary font-bold text-sm shrink-0">
                 {{ getInitials(ticket.customer?.firstname, ticket.customer?.lastname) }}
               </div>
-              <div>
-                <p class="text-sm text-gray-800 font-medium">{{ ticket.customer?.firstname }} {{ ticket.customer?.lastname }}</p>
-                <p class="text-xs text-gray-500">{{ ticket.customer?.email }}</p>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-900 font-bold truncate">{{ ticket.customer?.firstname }} {{ ticket.customer?.lastname }}</p>
+                <p class="text-xs text-gray-500 truncate">{{ ticket.customer?.email }}</p>
+                <div v-if="ticket.customer?.organization" class="mt-2 pt-2 border-t border-gray-200/60 flex items-center justify-between gap-2">
+                  <span class="text-xs font-semibold text-gray-700 truncate flex items-center gap-1">
+                    <Building2Icon class="w-3.5 h-3.5 text-gray-400" />
+                    {{ ticket.customer.organization.name }}
+                  </span>
+                  <span v-if="ticket.customer.organization.calendar_type === 'extended_8_21'" class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 shrink-0">
+                    SLA 8h-21h
+                  </span>
+                  <span v-else class="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 shrink-0">
+                    SLA 8h-18h
+                  </span>
+                </div>
               </div>
             </div>
           </div>
+
+          <!-- Responsável -->
           <div>
-            <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">Responsável</label>
+            <label class="text-xs text-gray-500 font-semibold uppercase tracking-wider block mb-1.5">Responsável / Técnico</label>
             <select 
-              v-if="isAdminOrAgent"
-              v-model="ticket.owner_id"
+              v-if="isAdminOrAgent" 
+              v-model="ticket.owner_id" 
               @change="updateAssignee"
-              class="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-800 focus:outline-none focus:border-df-primary focus:ring-1 focus:ring-df-primary"
+              class="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 text-sm text-gray-900 focus:outline-none focus:border-df-primary focus:ring-2 focus:ring-df-primary/20"
             >
               <option :value="null">Não Atribuído</option>
               <option v-for="agent in agents" :key="agent.id" :value="agent.id">
                 {{ agent.firstname }} {{ agent.lastname }}
               </option>
             </select>
-            <div v-else class="flex items-center gap-3">
+            <div v-else class="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
               <div v-if="ticket.owner" class="flex items-center gap-2">
                 <div class="w-6 h-6 rounded-full bg-df-primary/20 flex items-center justify-center text-df-primary font-bold text-xs">
                   {{ getInitials(ticket.owner?.firstname, ticket.owner?.lastname) }}
@@ -66,37 +118,77 @@
             </div>
           </div>
 
-          <div>
-            <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">Criado em</label>
-            <p class="text-sm text-gray-800">{{ new Date(ticket.created_at).toLocaleString() }}</p>
-          </div>
+          <!-- Painel de SLA em Horas Úteis -->
+          <div class="p-4 bg-gradient-to-br from-slate-50 to-blue-50/40 border border-blue-100/80 rounded-2xl space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-gray-900 uppercase tracking-wider">
+                <ClockIcon class="w-4 h-4 text-df-primary" />
+                <span>Prazos de SLA (Horas Úteis)</span>
+              </div>
+            </div>
 
-          <div v-if="ticket.custom_field_values && ticket.custom_field_values.length > 0">
-            <div class="h-px bg-gray-200 my-4"></div>
-            <h3 class="text-xs text-gray-500 font-medium uppercase tracking-wider mb-3">Detalhes Adicionais</h3>
-            <div class="space-y-3">
-              <div v-for="cfValue in ticket.custom_field_values" :key="cfValue.id">
-                <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">
-                  {{ cfValue.custom_field?.name }}
-                </label>
-                <p class="text-sm text-gray-800">{{ cfValue.value }}</p>
+            <div class="space-y-2.5">
+              <!-- 1ª Resposta -->
+              <div v-if="ticket.firstResponseEscalationAt" class="p-2.5 bg-white rounded-xl border border-gray-200/80 shadow-2xs">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-semibold text-gray-700">1º Atendimento Inicial</span>
+                  <span 
+                    class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md"
+                    :class="ticket.state_id === 1 && ticket.isEscalated ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-100'"
+                  >
+                    <span v-if="ticket.state_id === 1 && ticket.isEscalated">Violado</span>
+                    <span v-else>{{ formatTimeRemaining(ticket.firstResponseEscalationAt) }}</span>
+                  </span>
+                </div>
+                <div class="text-[11px] text-gray-400">
+                  Alvo: {{ new Date(ticket.firstResponseEscalationAt).toLocaleString('pt-BR') }}
+                </div>
+              </div>
+
+              <!-- Resolução Remota -->
+              <div v-if="ticket.solutionEscalationAt" class="p-2.5 bg-white rounded-xl border border-gray-200/80 shadow-2xs">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-semibold text-gray-700">Resolução Remota (4h)</span>
+                  <span 
+                    class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md"
+                    :class="ticket.isEscalated ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-purple-50 text-purple-700 border border-purple-100'"
+                  >
+                    <span v-if="ticket.isEscalated">Violado</span>
+                    <span v-else>{{ formatTimeRemaining(ticket.solutionEscalationAt) }}</span>
+                  </span>
+                </div>
+                <div class="text-[11px] text-gray-400">
+                  Alvo: {{ new Date(ticket.solutionEscalationAt).toLocaleString('pt-BR') }}
+                </div>
+              </div>
+
+              <!-- Resolução Presencial -->
+              <div v-if="ticket.onsiteResolutionEscalationAt || ticket.service_type === 'onsite'" class="p-2.5 bg-white rounded-xl border border-amber-200/80 shadow-2xs">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-semibold text-amber-900 flex items-center gap-1">
+                    <MapPinIcon class="w-3.5 h-3.5 text-amber-600" />
+                    Atendimento Presencial (8h)
+                  </span>
+                  <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                    {{ formatTimeRemaining(ticket.onsiteResolutionEscalationAt) }}
+                  </span>
+                </div>
+                <div class="text-[11px] text-gray-400">
+                  Alvo: {{ ticket.onsiteResolutionEscalationAt ? new Date(ticket.onsiteResolutionEscalationAt).toLocaleString('pt-BR') : 'A calcular' }}
+                </div>
               </div>
             </div>
           </div>
 
-          <div v-if="ticket.firstResponseEscalationAt" class="pt-2">
-            <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-1">
-              Acordo de Nível de Serviço (SLA)
-            </label>
-            <div class="flex items-center gap-2 mt-1">
-              <span v-if="ticket.isEscalated" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-red-100 text-red-700 border border-red-200">
-                <AlertCircleIcon class="w-4 h-4" /> Violado em {{ new Date(ticket.firstResponseEscalationAt).toLocaleString() }}
-              </span>
-              <span v-else class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border" :class="isNearBreach(ticket.firstResponseEscalationAt) ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-gray-50 text-gray-700 border-gray-200'">
-                <ClockIcon class="w-4 h-4" /> Vence em: {{ formatTimeRemaining(ticket.firstResponseEscalationAt) }}
-              </span>
+          <!-- Campos Customizados -->
+          <div v-if="ticket.custom_field_values && ticket.custom_field_values.length > 0" class="pt-2 border-t border-gray-100">
+            <h3 class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">Detalhes Adicionais</h3>
+            <div class="space-y-2">
+              <div v-for="cfValue in ticket.custom_field_values" :key="cfValue.id" class="text-xs">
+                <span class="text-gray-500 block">{{ cfValue.custom_field?.name }}:</span>
+                <span class="font-medium text-gray-800">{{ cfValue.value }}</span>
+              </div>
             </div>
-            <p v-if="!ticket.isEscalated" class="text-xs text-gray-400 mt-1.5">Alvo: {{ new Date(ticket.firstResponseEscalationAt).toLocaleString() }}</p>
           </div>
         </div>
       </div>
@@ -112,7 +204,7 @@
         </button>
       </div>
 
-      <div class="flex-1"></div> <!-- Spacer -->
+      <div class="flex-1"></div>
     </div>
 
     <!-- Right Column: Articles Timeline -->
@@ -121,7 +213,7 @@
       <div class="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
         <h3 class="text-gray-800 font-medium flex items-center gap-2">
           <MessageSquareIcon class="w-5 h-5 text-df-primary" />
-          Conversa
+          Conversa & Histórico
         </h3>
         
         <div v-if="isAdminOrAgent && macros.length > 0" class="relative">
@@ -210,7 +302,6 @@
         </div>
       </div>
 
-
       <!-- AI Assistant Summary Box (if generated) -->
       <div v-if="aiSummary" class="mx-4 mt-3 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200/80 rounded-2xl shadow-xs animate-in fade-in zoom-in-95 duration-150">
         <div class="flex items-center justify-between mb-2">
@@ -253,6 +344,7 @@
           </button>
         </div>
       </div>
+
       <!-- Reply Box -->
       <div class="p-4 pt-2 bg-gray-50">
         <form @submit.prevent="handleReply" class="relative">
@@ -288,10 +380,29 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Loader2 as Loader2Icon, MessageSquare as MessageSquareIcon, Send as SendIcon, User as UserIcon, Lock as LockIcon, Activity as ActivityIcon, X as XIcon, Play as PlayIcon, ChevronDown as ChevronDownIcon, Clock as ClockIcon, AlertCircle as AlertCircleIcon, Sparkles as SparklesIcon } from 'lucide-vue-next'
+import { 
+  Loader2 as Loader2Icon, 
+  MessageSquare as MessageSquareIcon, 
+  Send as SendIcon, 
+  User as UserIcon, 
+  Lock as LockIcon, 
+  Activity as ActivityIcon, 
+  X as XIcon, 
+  Play as PlayIcon, 
+  ChevronDown as ChevronDownIcon, 
+  Clock as ClockIcon, 
+  AlertCircle as AlertCircleIcon, 
+  Sparkles as SparklesIcon,
+  Building2 as Building2Icon,
+  Monitor as MonitorIcon,
+  MapPin as MapPinIcon
+} from 'lucide-vue-next'
 import { ticketService } from '../services/ticketService'
 import { iamService } from '../services/iamService'
 import api from '../services/api'
+import { useToast } from '@/composables/useToast'
+
+const { success: toastSuccess, error: toastError } = useToast()
 
 const route = useRoute()
 const router = useRouter()
@@ -317,7 +428,7 @@ const generateAiSummary = async () => {
     aiSummary.value = res.data.summary
   } catch (error) {
     console.error('Failed to generate AI summary', error)
-    alert('Não foi possível gerar o resumo com IA.')
+    toastError('Erro', 'Não foi possível gerar o resumo com IA.')
   } finally {
     isGeneratingSummary.value = false
   }
@@ -331,7 +442,7 @@ const generateAiSuggestion = async () => {
     replyText.value = res.data.suggestion
   } catch (error) {
     console.error('Failed to generate AI suggestion', error)
-    alert('Não foi possível sugerir resposta com IA.')
+    toastError('Erro', 'Não foi possível sugerir resposta com IA.')
   } finally {
     isGeneratingSuggestion.value = false
   }
@@ -349,12 +460,15 @@ const getStatusName = (stateId: number) => {
 const formatField = (field: string) => {
   if (field === 'state_id') return 'Status';
   if (field === 'owner_id') return 'Responsável';
+  if (field === 'service_type') return 'Modalidade';
+  if (field === 'priority_id') return 'Prioridade';
   return field;
 }
 
 const formatValue = (field: string, val: string) => {
   if (val === null || val === undefined || val === 'undefined') return 'Não Atribuído';
   if (field === 'state_id') return getStatusName(parseInt(val));
+  if (field === 'service_type') return val === 'onsite' ? 'Presencial' : 'Remoto';
   if (field === 'owner_id') {
     const agent = agents.value.find(a => a.id === parseInt(val));
     return agent ? `${agent.firstname} ${agent.lastname}` : `Usuário #${val}`;
@@ -383,36 +497,28 @@ const timelineItems = computed(() => {
   return items.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 })
 
-const isNearBreach = (dateString: string) => {
-  if (!dateString) return false
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffHours = (date.getTime() - now.getTime()) / (1000 * 60 * 60)
-  return diffHours > 0 && diffHours <= 1 // Less than 1 hour remaining
-}
-
 const formatTimeRemaining = (dateString: string) => {
-  if (!dateString) return ''
+  if (!dateString) return '—'
   const date = new Date(dateString)
   const now = new Date()
   const diffMs = date.getTime() - now.getTime()
   
-  if (diffMs <= 0) return 'Vencido'
+  if (diffMs <= 0) return 'Prazo Excedido'
   
   const diffMins = Math.floor(diffMs / (1000 * 60))
   if (diffMins < 60) {
-    return `${diffMins}m`
+    return `${diffMins}m restantes`
   }
   
   const diffHours = Math.floor(diffMins / 60)
   const remainingMins = diffMins % 60
   
   if (diffHours < 24) {
-    return `${diffHours}h ${remainingMins > 0 ? remainingMins + 'm' : ''}`
+    return `${diffHours}h ${remainingMins > 0 ? remainingMins + 'm' : ''} restantes`
   }
   
   const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d ${diffHours % 24}h`
+  return `${diffDays}d ${diffHours % 24}h restantes`
 }
 
 const scrollToBottom = () => {
@@ -446,18 +552,33 @@ const fetchAgents = async () => {
 const updateState = async () => {
   try {
     await ticketService.changeState(ticket.value.id, ticket.value.state_id)
+    toastSuccess('Sucesso', 'Status atualizado com sucesso.')
     await fetchTicket()
   } catch (error) {
     console.error("Failed to update state", error)
+    toastError('Erro', 'Falha ao atualizar status.')
+  }
+}
+
+const setServiceType = async (serviceType: 'remote' | 'onsite') => {
+  try {
+    await ticketService.changeServiceType(ticket.value.id, serviceType)
+    toastSuccess('Sucesso', `Modalidade alterada para ${serviceType === 'onsite' ? 'Presencial (8h SLA)' : 'Remoto (4h SLA)'}`)
+    await fetchTicket()
+  } catch (error) {
+    console.error("Failed to update service type", error)
+    toastError('Erro', 'Falha ao atualizar modalidade de atendimento.')
   }
 }
 
 const updateAssignee = async () => {
   try {
     await ticketService.assignTicket(ticket.value.id, ticket.value.owner_id)
+    toastSuccess('Sucesso', 'Responsável atualizado.')
     await fetchTicket()
   } catch (error) {
     console.error("Failed to update assignee", error)
+    toastError('Erro', 'Falha ao atualizar responsável.')
   }
 }
 
@@ -469,11 +590,10 @@ const handleReply = async () => {
     await ticketService.addArticle(ticket.value.id, replyText.value, isInternalNote.value)
     replyText.value = ''
     isInternalNote.value = false
-    // Refresh the ticket to get the new article
     await fetchTicket()
   } catch (error) {
     console.error("Failed to post reply", error)
-    alert("Falha ao enviar resposta.")
+    toastError('Erro', 'Falha ao enviar resposta.')
   } finally {
     isSubmitting.value = false
   }
@@ -495,10 +615,11 @@ const applyMacro = async (macroId: number) => {
   
   try {
     await api.post(`/tickets/${ticket.value.id}/macros/${macroId}/apply`)
+    toastSuccess('Sucesso', 'Macro aplicada com sucesso.')
     await fetchTicket()
   } catch (error) {
     console.error("Failed to apply macro", error)
-    alert("Falha ao aplicar macro.")
+    toastError('Erro', 'Falha ao aplicar macro.')
   } finally {
     isSubmitting.value = false
   }
@@ -511,7 +632,7 @@ onMounted(() => {
       const user = JSON.parse(userStr)
       if (user.roles && (user.roles.includes('admin') || user.roles.includes('agent'))) {
         isAdminOrAgent.value = true
-        fetchAgents() // Only fetch agents if current user has permissions
+        fetchAgents()
         fetchMacros()
       }
     } catch(e) {}

@@ -2,6 +2,11 @@
 import { ref, onMounted } from 'vue';
 import { SettingsIcon, PlusIcon, Edit2Icon, Trash2Icon } from 'lucide-vue-next';
 import { customFieldsService, type CustomField } from '../../services/customFieldsService';
+import { useToast } from '@/composables/useToast';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { success: toastSuccess, error: toastError } = useToast();
+const { confirm: dialogConfirm } = useConfirm();
 
 const customFields = ref<CustomField[]>([]);
 const isLoading = ref(true);
@@ -26,7 +31,7 @@ const loadFields = async () => {
   try {
     customFields.value = await customFieldsService.getCustomFields();
   } catch (error) {
-    alert('Falha ao carregar campos personalizados');
+    toastError('Erro', 'Falha ao carregar campos personalizados.');
   } finally {
     isLoading.value = false;
   }
@@ -60,24 +65,34 @@ const saveField = async () => {
   try {
     if (editingField.value) {
       await customFieldsService.updateCustomField(editingField.value.id, formData.value);
+      toastSuccess('Sucesso', 'Campo personalizado atualizado.');
     } else {
       await customFieldsService.createCustomField(formData.value);
+      toastSuccess('Sucesso', 'Campo personalizado criado.');
     }
     showModal.value = false;
     await loadFields();
   } catch (error) {
-    alert('Falha ao salvar campo');
+    toastError('Erro', 'Falha ao salvar campo personalizado.');
   }
 };
 
 const deleteField = async (id: number) => {
-  if (confirm('Tem certeza que deseja excluir este campo? Isso não removerá dados existentes, mas o ocultará dos formulários.')) {
-    try {
-      await customFieldsService.deleteCustomField(id);
-      await loadFields();
-    } catch (error) {
-      alert('Falha ao excluir campo');
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Campo Personalizado',
+    message: 'Tem certeza que deseja excluir este campo? Isso não removerá dados existentes, mas o ocultará dos formulários de chamados.',
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  });
+  if (!ok) return;
+
+  try {
+    await customFieldsService.deleteCustomField(id);
+    toastSuccess('Sucesso', 'Campo personalizado excluído.');
+    await loadFields();
+  } catch (error) {
+    toastError('Erro', 'Falha ao excluir campo personalizado.');
   }
 };
 </script>

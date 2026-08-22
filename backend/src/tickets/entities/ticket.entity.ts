@@ -17,6 +17,10 @@ export class Ticket {
   @Column({ default: 'web' })
   source: string;
 
+  // remote, onsite
+  @Column({ default: 'remote' })
+  service_type: string;
+
   @Column({ name: 'group_id' })
   group_id: number;
 
@@ -73,6 +77,9 @@ export class Ticket {
   solutionEscalationAt: Date;
 
   @Column({ type: 'timestamp', nullable: true })
+  onsiteResolutionEscalationAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
   sla_paused_at: Date | null;
 
   @Column({ default: false })
@@ -83,6 +90,12 @@ export class Ticket {
 
   @Column({ type: 'text', nullable: true })
   satisfaction_comment: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  satisfaction_answered_at: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  csat_stage: string | null;
 
   @Column({ type: 'varchar', nullable: true, unique: true })
   csat_token: string;

@@ -330,6 +330,11 @@ import {
   Loader2 as Loader2Icon 
 } from 'lucide-vue-next'
 import { adminService } from '../../services/adminService'
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+
+const { success: toastSuccess, error: toastError } = useToast()
+const { confirm: dialogConfirm } = useConfirm()
 
 const users = ref<any[]>([])
 const allRoles = ref<any[]>([])
@@ -491,28 +496,38 @@ const saveUser = async () => {
         delete payload.password
       }
       await adminService.updateUser(editingUser.value.id, payload)
+      toastSuccess('Sucesso', 'Usuário atualizado com sucesso.')
     } else {
       await adminService.createUser(payload)
+      toastSuccess('Sucesso', 'Usuário criado com sucesso.')
     }
     closeModal()
     await loadData()
   } catch (error) {
     console.error('Erro ao salvar usuário:', error)
-    alert('Erro ao salvar usuário. Verifique se o e-mail já não está cadastrado.')
+    toastError('Erro', 'Erro ao salvar usuário. Verifique se o e-mail já não está cadastrado.')
   } finally {
     isSubmitting.value = false
   }
 }
 
 const deleteUser = async (id: number) => {
-  if (confirm('Tem certeza que deseja excluir este usuário?')) {
-    try {
-      await adminService.deleteUser(id)
-      await loadData()
-    } catch (error) {
-      console.error('Erro ao excluir usuário:', error)
-      alert('Não foi possível excluir o usuário.')
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Usuário',
+    message: 'Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.',
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  })
+  if (!ok) return
+
+  try {
+    await adminService.deleteUser(id)
+    toastSuccess('Sucesso', 'Usuário excluído com sucesso.')
+    await loadData()
+  } catch (error) {
+    console.error('Erro ao excluir usuário:', error)
+    toastError('Erro', 'Não foi possível excluir o usuário.')
   }
 }
 </script>

@@ -271,8 +271,10 @@ import { PlusIcon, EditIcon, TrashIcon, ZapIcon, XIcon, Loader2Icon } from 'luci
 import { triggerService, type Trigger } from '../../services/triggerService';
 import api from '@/services/api';
 import { useToast } from '@/composables/useToast';
+import { useConfirm } from '@/composables/useConfirm';
 
 const { success: toastSuccess, error: toastError } = useToast();
+const { confirm: dialogConfirm } = useConfirm();
 
 const triggers = ref<Trigger[]>([]);
 const groups = ref<any[]>([]);
@@ -387,14 +389,21 @@ const saveTrigger = async () => {
 
 const confirmDelete = async (trigger: Trigger) => {
   if (!trigger.id) return;
-  if (confirm(`Deseja realmente excluir o gatilho "${trigger.name}"?`)) {
-    try {
-      await triggerService.delete(trigger.id);
-      toastSuccess('Sucesso', 'Gatilho excluído com sucesso.');
-      await loadTriggers();
-    } catch (error) {
-      toastError('Erro', 'Falha ao excluir o gatilho.');
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Gatilho',
+    message: `Deseja realmente excluir o gatilho "${trigger.name}"? As automações associadas a ele deixarão de rodar.`,
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  });
+  if (!ok) return;
+
+  try {
+    await triggerService.delete(trigger.id);
+    toastSuccess('Sucesso', 'Gatilho excluído com sucesso.');
+    await loadTriggers();
+  } catch (error) {
+    toastError('Erro', 'Falha ao excluir o gatilho.');
   }
 };
 </script>

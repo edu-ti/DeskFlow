@@ -2,6 +2,11 @@
 import { ref, onMounted } from 'vue';
 import { PlusIcon, EditIcon, TrashIcon, PlayIcon, SaveIcon, XIcon, PlusCircleIcon, Trash2Icon } from 'lucide-vue-next';
 import api from '../../services/api';
+import { useToast } from '@/composables/useToast';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { success: toastSuccess, error: toastError } = useToast();
+const { confirm: dialogConfirm } = useConfirm();
 
 interface MacroAction {
   field: string;
@@ -76,24 +81,36 @@ const saveMacro = async () => {
   try {
     if (editingMacro.value.id) {
       await api.put(`/admin/macros/${editingMacro.value.id}`, editingMacro.value);
+      toastSuccess('Sucesso', 'Macro atualizada com sucesso.');
     } else {
       await api.post('/admin/macros', editingMacro.value);
+      toastSuccess('Sucesso', 'Macro criada com sucesso.');
     }
     closeModal();
     fetchMacros();
   } catch (err) {
     console.error('Falha ao salvar macro', err);
+    toastError('Erro', 'Falha ao salvar macro.');
   }
 };
 
 const deleteMacro = async (id: number) => {
-  if (confirm('Tem certeza que deseja excluir esta macro?')) {
-    try {
-      await api.delete(`/admin/macros/${id}`);
-      fetchMacros();
-    } catch (err) {
-      console.error('Falha ao excluir macro', err);
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Macro',
+    message: 'Tem certeza que deseja excluir esta macro?',
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  });
+  if (!ok) return;
+
+  try {
+    await api.delete(`/admin/macros/${id}`);
+    toastSuccess('Sucesso', 'Macro excluída com sucesso.');
+    fetchMacros();
+  } catch (err) {
+    console.error('Falha ao excluir macro', err);
+    toastError('Erro', 'Falha ao excluir macro.');
   }
 };
 </script>

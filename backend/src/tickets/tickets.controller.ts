@@ -123,6 +123,16 @@ export class TicketsController {
     return this.ticketService.changeTitle(id, title, req.user.id);
   }
 
+  @Patch(':id/service-type')
+  @UseGuards(TicketVisibilityGuard)
+  async changeServiceType(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('service_type') serviceType: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.ticketService.changeServiceType(id, serviceType, req.user.id);
+  }
+
   @Post(':id/merge')
   @UseGuards(TicketVisibilityGuard)
   async mergeTickets(

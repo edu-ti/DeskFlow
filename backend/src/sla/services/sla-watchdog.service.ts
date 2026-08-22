@@ -52,6 +52,11 @@ export class SlaWatchdogService {
         reason = 'tempo limite de resolução excedido';
       }
 
+      if (ticket.service_type === 'onsite' && ticket.onsiteResolutionEscalationAt && ticket.onsiteResolutionEscalationAt <= now) {
+        shouldEscalate = true;
+        reason = 'tempo limite de atendimento presencial excedido';
+      }
+
       if (shouldEscalate) {
         this.logger.warn(`[SLA WATCHDOG] Chamado #${ticket.id} escalonado: ${reason}`);
         ticket.isEscalated = true;

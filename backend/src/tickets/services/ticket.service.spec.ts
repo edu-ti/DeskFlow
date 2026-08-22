@@ -6,6 +6,7 @@ import { Article } from '../entities/article.entity';
 import { TicketHistory } from '../entities/ticket-history.entity';
 import { TicketCustomFieldValue } from '../entities/ticket-custom-field-value.entity';
 import { TicketLink } from '../entities/ticket-link.entity';
+import { User } from '../../iam/entities/user.entity';
 import { Repository } from 'typeorm';
 import { getQueueToken } from '@nestjs/bullmq';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -56,6 +57,10 @@ describe('TicketService (PT-002 - Soft Delete)', () => {
           useValue: {},
         },
         {
+          provide: getRepositoryToken(User),
+          useValue: { findOne: jest.fn() },
+        },
+        {
           provide: getQueueToken('sla-queue'),
           useValue: {},
         },
@@ -73,7 +78,7 @@ describe('TicketService (PT-002 - Soft Delete)', () => {
         },
         {
           provide: SlaPoliciesService,
-          useValue: {},
+          useValue: { getMatchingPolicy: jest.fn() },
         },
         {
           provide: WhatsappService,

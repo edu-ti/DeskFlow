@@ -174,10 +174,15 @@ import {
   Search as SearchIcon, 
   Edit2 as Edit2Icon, 
   Trash2 as Trash2Icon, 
-  X as XIcon, 
-  Loader2 as Loader2Icon 
+  X as XIcon,
+  Loader2 as Loader2Icon
 } from 'lucide-vue-next'
 import { adminService } from '../../services/adminService'
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+
+const { success: toastSuccess, error: toastError } = useToast()
+const { confirm: dialogConfirm } = useConfirm()
 
 const groups = ref<any[]>([])
 const isLoading = ref(true)
@@ -233,28 +238,38 @@ const saveGroup = async () => {
   try {
     if (editingGroup.value) {
       await adminService.updateGroup(editingGroup.value.id, form.value)
+      toastSuccess('Sucesso', 'Grupo atualizado com sucesso.')
     } else {
       await adminService.createGroup(form.value)
+      toastSuccess('Sucesso', 'Grupo criado com sucesso.')
     }
     closeModal()
     await loadData()
   } catch (error) {
     console.error('Erro ao salvar grupo:', error)
-    alert('Erro ao salvar grupo.')
+    toastError('Erro', 'Erro ao salvar grupo.')
   } finally {
     isSubmitting.value = false
   }
 }
 
 const deleteGroup = async (id: number) => {
-  if (confirm('Tem certeza que deseja excluir este grupo?')) {
-    try {
-      await adminService.deleteGroup(id)
-      await loadData()
-    } catch (error) {
-      console.error('Erro ao excluir grupo:', error)
-      alert('Não foi possível excluir o grupo. Ele pode estar vinculado a chamados existentes.')
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Grupo',
+    message: 'Tem certeza que deseja excluir este grupo? Ele não poderá ser excluído se possuir chamados ou agentes vinculados.',
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  })
+  if (!ok) return
+
+  try {
+    await adminService.deleteGroup(id)
+    toastSuccess('Sucesso', 'Grupo excluído com sucesso.')
+    await loadData()
+  } catch (error) {
+    console.error('Erro ao excluir grupo:', error)
+    toastError('Erro', 'Não foi possível excluir o grupo. Ele pode estar vinculado a chamados existentes.')
   }
 }
 </script>

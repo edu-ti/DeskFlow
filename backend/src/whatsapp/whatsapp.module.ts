@@ -7,6 +7,7 @@ import { WhatsappCallingController } from './whatsapp-calling.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../iam/entities/user.entity';
 import { Role } from '../iam/entities/role.entity';
+import { Group } from '../iam/entities/group.entity';
 import { CtiLog } from '../cti/entities/cti-log.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
 import { TicketsModule } from '../tickets/tickets.module';
@@ -18,7 +19,7 @@ import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Role, CtiLog, AuditLog]),
+    TypeOrmModule.forFeature([User, Role, Group, CtiLog, AuditLog]),
     forwardRef(() => TicketsModule),
     forwardRef(() => AiModule),
     SettingsModule,

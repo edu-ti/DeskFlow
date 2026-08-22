@@ -210,6 +210,9 @@ import {
   Loader2 as Loader2Icon
 } from 'lucide-vue-next'
 import { adminService } from '../services/adminService'
+import { useToast } from '@/composables/useToast'
+
+const { success: toastSuccess, error: toastError } = useToast()
 
 const contacts = ref<any[]>([])
 const organizations = ref<any[]>([])
@@ -334,18 +337,20 @@ const saveContact = async () => {
     }
     if (editingContact.value) {
       await adminService.updateUser(editingContact.value.id, payload)
+      toastSuccess('Sucesso', 'Contato atualizado com sucesso.')
     } else {
       payload.login = form.value.email
       if (customerRoleId.value) {
         payload.roles = [{ id: customerRoleId.value }]
       }
       await adminService.createUser(payload)
+      toastSuccess('Sucesso', 'Contato criado com sucesso.')
     }
     closeModal()
     await loadData()
   } catch (error) {
     console.error('Erro ao salvar contato:', error)
-    alert('Erro ao salvar contato.')
+    toastError('Erro', 'Erro ao salvar contato. Verifique se o e-mail já não está cadastrado.')
   } finally {
     isSubmitting.value = false
   }
@@ -355,10 +360,11 @@ const toggleActive = async (contact: any) => {
   menuOpenId.value = null
   try {
     await adminService.updateUser(contact.id, { is_active: contact.is_active === false })
+    toastSuccess('Sucesso', `Contato ${contact.is_active === false ? 'ativado' : 'desativado'}.`)
     await loadData()
   } catch (error) {
     console.error('Erro ao alterar status do contato:', error)
-    alert('Erro ao alterar status do contato.')
+    toastError('Erro', 'Erro ao alterar status do contato.')
   }
 }
 </script>

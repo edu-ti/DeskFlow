@@ -68,6 +68,17 @@
           <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Contatos</span>
         </router-link>
 
+        <router-link 
+          to="/calendar" 
+          class="flex items-center py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors group"
+          :class="isSidebarCollapsed ? 'justify-center px-0' : 'px-3'"
+          active-class="bg-df-primary text-white hover:text-white hover:bg-df-primary"
+          title="Agenda & Field Service"
+        >
+          <CalendarIcon class="w-5 h-5 flex-shrink-0" :class="isSidebarCollapsed ? 'mr-0' : 'mr-3'" />
+          <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Agenda (Field Service)</span>
+        </router-link>
+
         <template v-if="isAdmin">
           <div class="pt-6 pb-2" :class="isSidebarCollapsed ? 'px-0 text-center' : 'px-3'">
             <p v-if="!isSidebarCollapsed" class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Administração</p>
@@ -227,6 +238,17 @@
             <ShieldAlertIcon class="w-5 h-5 flex-shrink-0" :class="isSidebarCollapsed ? 'mr-0' : 'mr-3'" />
             <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Auditoria & LGPD</span>
           </router-link>
+
+          <router-link 
+            to="/admin/inventory" 
+            class="flex items-center py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors group"
+            :class="isSidebarCollapsed ? 'justify-center px-0' : 'px-3'"
+            active-class="bg-df-primary text-white hover:text-white hover:bg-df-primary"
+            title="Inventário & RMM"
+          >
+            <CpuIcon class="w-5 h-5 flex-shrink-0" :class="isSidebarCollapsed ? 'mr-0' : 'mr-3'" />
+            <span v-if="!isSidebarCollapsed" class="font-medium whitespace-nowrap">Inventário & RMM</span>
+          </router-link>
         </template>
       </nav>
 
@@ -372,7 +394,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon, LayoutDashboard as LayoutDashboardIcon, Shield as ShieldIcon, FolderKey as FolderKeyIcon, Settings as SettingsIcon, BookOpen as BookOpenIcon, Play as PlayIcon, Menu as MenuIcon, Zap as ZapIcon, Loader2 as Loader2Icon, BarChart2 as BarChart2Icon, Clock as ClockIcon, ShieldAlert as ShieldAlertIcon, Building2 as Building2Icon, Tag as TagIcon, Layers as LayersIcon, FileText as FileTextIcon } from 'lucide-vue-next'
+import { Ticket as TicketIcon, Inbox as InboxIcon, Users as UsersIcon, Search as SearchIcon, Bell as BellIcon, LogOut as LogOutIcon, LayoutDashboard as LayoutDashboardIcon, Shield as ShieldIcon, FolderKey as FolderKeyIcon, Settings as SettingsIcon, BookOpen as BookOpenIcon, Play as PlayIcon, Menu as MenuIcon, Zap as ZapIcon, Loader2 as Loader2Icon, BarChart2 as BarChart2Icon, Clock as ClockIcon, ShieldAlert as ShieldAlertIcon, Building2 as Building2Icon, Tag as TagIcon, Layers as LayersIcon, FileText as FileTextIcon, Calendar as CalendarIcon, Cpu as CpuIcon } from 'lucide-vue-next'
 import { socketService } from '@/services/socketService'
 import { useNotificationsStore } from '@/stores/notificationsStore'
 import { searchService, type SearchResult } from '@/services/searchService'

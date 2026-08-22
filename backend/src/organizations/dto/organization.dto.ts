@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateOrganizationDto {
   @IsString()
@@ -12,6 +12,14 @@ export class CreateOrganizationDto {
   @IsOptional()
   @IsString()
   cnpj?: string;
+
+  @IsOptional()
+  @IsString()
+  calendar_type?: string;
+
+  @IsOptional()
+  @IsNumber()
+  sla_policy_id?: number | null;
 
   @IsOptional()
   @IsString()
@@ -39,6 +47,14 @@ export class UpdateOrganizationDto {
   @IsOptional()
   @IsString()
   cnpj?: string;
+
+  @IsOptional()
+  @IsString()
+  calendar_type?: string;
+
+  @IsOptional()
+  @IsNumber()
+  sla_policy_id?: number | null;
 
   @IsOptional()
   @IsString()

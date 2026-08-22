@@ -79,9 +79,13 @@ import { Scheduler } from './schedulers/entities/scheduler.entity';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { Webhook } from './webhooks/entities/webhook.entity';
 import { ImportModule } from './import/import.module';
-import { IntegrationsModule } from './integrations/integrations.module';
 import { PublicLinksModule } from './public-links/public-links.module';
 import { PublicLink } from './public-links/entities/public-link.entity';
+import { FieldServiceModule } from './field-service/field-service.module';
+import { FieldActivity } from './field-service/entities/field-activity.entity';
+import { RmmModule } from './rmm/rmm.module';
+import { Device } from './rmm/entities/device.entity';
+import { DeviceAlert } from './rmm/entities/device-alert.entity';
 
 @Module({
   imports: [
@@ -96,7 +100,7 @@ import { PublicLink } from './public-links/entities/public-link.entity';
         username: configService.get<string>('DB_USER', 'deskflow'),
         password: configService.get<string>('DB_PASS', 'deskflow_password'),
         database: configService.get<string>('DB_NAME', 'deskflow_db'),
-        entities: [User, Group, Role, Organization, Tag, TicketTag, Overview, TextModule, Checklist, ChecklistItem, Mention, TimeAccounting, ChatSession, ChatMessage, CtiLog, PostmasterFilter, LdapSource, ExternalCredential, PgpKey, SmimeCertificate, SslCertificate, DataPrivacyTask, Scheduler, Webhook, PublicLink, Ticket, Article, TicketHistory, TicketLink, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle, Macro, Trigger, Setting, SlaPolicy, AuditLog],
+        entities: [User, Group, Role, Organization, Tag, TicketTag, Overview, TextModule, Checklist, ChecklistItem, Mention, TimeAccounting, ChatSession, ChatMessage, CtiLog, PostmasterFilter, LdapSource, ExternalCredential, PgpKey, SmimeCertificate, SslCertificate, DataPrivacyTask, Scheduler, Webhook, PublicLink, Ticket, Article, TicketHistory, TicketLink, CustomField, TicketCustomFieldValue, Notification, KbCategory, KbArticle, Macro, Trigger, Setting, SlaPolicy, AuditLog, FieldActivity, Device, DeviceAlert],
         synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true', // true apenas em dev; em produção defina DB_SYNCHRONIZE=false e use migrations
       }),
     }),
@@ -132,6 +136,8 @@ import { PublicLink } from './public-links/entities/public-link.entity';
     ImportModule,
     IntegrationsModule,
     PublicLinksModule,
+    FieldServiceModule,
+    RmmModule,
     TicketsModule,
     NotificationsModule,
     KbModule,

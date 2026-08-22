@@ -4,6 +4,10 @@ export interface CreateTicketData {
   title: string;
   initial_article_body: string;
   custom_fields?: { field_id: number; value: string }[];
+  customer_id?: number;
+  group_id?: number;
+  priority_id?: number;
+  service_type?: string;
 }
 
 export const ticketService = {
@@ -34,6 +38,11 @@ export const ticketService = {
 
   async assignTicket(ticketId: number, ownerId: number | null) {
     const response = await api.patch(`/tickets/${ticketId}/assign`, { owner_id: ownerId })
+    return response.data
+  },
+
+  async changeServiceType(ticketId: number, serviceType: string) {
+    const response = await api.patch(`/tickets/${ticketId}/service-type`, { service_type: serviceType })
     return response.data
   },
 

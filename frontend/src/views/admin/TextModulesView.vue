@@ -82,8 +82,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { FileText as FileTextIcon, Edit2 as Edit2Icon, Trash2 as Trash2Icon, X as XIcon, Loader2 as Loader2Icon } from 'lucide-vue-next'
 import { textModulesService } from '../../services/textModulesService'
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+
+const { success: toastSuccess, error: toastError } = useToast()
+const { confirm: dialogConfirm } = useConfirm()
 
 const modules = ref<any[]>([])
 const isLoading = ref(true)
@@ -129,27 +133,38 @@ const save = async () => {
     payload.keywords = keywordsText.value.split(',').map((k) => k.trim()).filter(Boolean)
     if (editing.value) {
       await textModulesService.update(editing.value.id, payload)
+      toastSuccess('Sucesso', 'Resposta pronta atualizada com sucesso.')
     } else {
       await textModulesService.create(payload)
+      toastSuccess('Sucesso', 'Resposta pronta criada com sucesso.')
     }
     closeModal()
     await loadData()
   } catch (e) {
     console.error('Erro ao salvar resposta:', e)
-    alert('Erro ao salvar resposta.')
+    toastError('Erro', 'Erro ao salvar resposta pronta.')
   } finally {
     isSubmitting.value = false
   }
 }
 
 const remove = async (id: number) => {
-  if (confirm('Excluir esta resposta?')) {
-    try {
-      await textModulesService.remove(id)
-      await loadData()
-    } catch (e) {
-      console.error('Erro ao excluir resposta:', e)
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Resposta Pronta',
+    message: 'Tem certeza que deseja excluir esta resposta pronta?',
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  })
+  if (!ok) return
+
+  try {
+    await textModulesService.remove(id)
+    toastSuccess('Sucesso', 'Resposta pronta excluída.')
+    await loadData()
+  } catch (e) {
+    console.error('Erro ao excluir resposta:', e)
+    toastError('Erro', 'Não foi possível excluir a resposta pronta.')
   }
 }
 </script>

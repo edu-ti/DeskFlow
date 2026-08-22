@@ -1,16 +1,18 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, LessThan, IsNull } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { isAxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { User } from '../iam/entities/user.entity';
 import { Role } from '../iam/entities/role.entity';
+import { Group } from '../iam/entities/group.entity';
 import { TicketService } from '../tickets/services/ticket.service';
 import { Ticket } from '../tickets/entities/ticket.entity';
 import { SettingsService } from '../settings/services/settings.service';
 import { AiService } from '../ai/ai.service';
 import { GRAPH_API_BASE } from '../common/graph-api.constants';
+import { BusinessHoursUtil } from '../sla/business-hours.util';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,6 +26,8 @@ export class WhatsappService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
+    @InjectRepository(Group)
+    private readonly groupRepository: Repository<Group>,
     @Inject(forwardRef(() => TicketService))
     private readonly ticketService: TicketService,
     private readonly settingsService: SettingsService,
@@ -64,114 +68,301 @@ export class WhatsappService {
     });
   }
 
-  async findOrCreateTicketForPhone(
-    fromPhone: string,
-    profileName: string,
-    title: string,
-  ): Promise<{ user: User; ticket: Ticket }> {
-    const user = await this.getOrCreateCustomerUser(fromPhone, profileName);
-    let ticket = await this.findActiveWhatsAppTicket(user.id);
-    if (!ticket) {
-      ticket = await this.ticketService.createTicket(
-        { title, customer_id: user.id, group_id: 1, priority_id: 2, state_id: 1, source: 'whatsapp' },
-        '',
-      );
-    }
-    return { user, ticket };
+  async findPendingCsatTicket(customerId: number): Promise<Ticket | null> {
+    return this.ticketService['ticketRepository'].findOne({
+      where: {
+        customer_id: customerId,
+        source: 'whatsapp',
+        csat_stage: In(['PENDING_RATING', 'PENDING_FEEDBACK']),
+      },
+      order: { updated_at: 'DESC' },
+    });
   }
 
-  async addCallArticle(ticketId: number, state: { from: string; to: string; direction?: string; status?: string }, duration?: number) {
-    const dirLabel = state.direction === 'BUSINESS_INITIATED' ? 'Saída' : 'Entrada';
-    const summary =
-      `📞 **Chamada de voz WhatsApp (${dirLabel})**\n` +
-      `- De: ${state.from}\n` +
-      `- Para: ${state.to}\n` +
-      `- Status: ${state.status || 'finalizada'}\n` +
-      `- Duração: ${duration ? `${duration}s` : 'não informada'}`;
-    await this.ticketService.addArticle(ticketId, summary, 'note', true, undefined, []);
+  /**
+   * Calcula em tempo real a posição do chamado na fila do grupo.
+   * Considera chamados abertos não atribuídos no mesmo grupo criados antes deste.
+   */
+  async getQueuePosition(ticketId: number, groupId: number): Promise<number> {
+    const currentTicket = await this.ticketService['ticketRepository'].findOne({ where: { id: ticketId } });
+    if (!currentTicket) return 1;
+
+    const countBefore = await this.ticketService['ticketRepository'].count({
+      where: {
+        group_id: groupId,
+        state_id: In([1, 2]),
+        owner_id: IsNull(),
+        created_at: LessThan(currentTicket.created_at),
+      },
+    });
+
+    return countBefore + 1;
+  }
+
+  /**
+   * Dispara a pesquisa CSAT via WhatsApp (Etapa 1: Nota 1 a 5 ou 9)
+   */
+  async sendCsatSurvey(ticketId: number, phone: string) {
+    const ticket = await this.ticketService['ticketRepository'].findOne({ where: { id: ticketId } });
+    if (!ticket) return;
+
+    ticket.csat_stage = 'PENDING_RATING';
+    await this.ticketService['ticketRepository'].save(ticket);
+
+    const csatMenu =
+      `Por favor, nos conte como foi o seu atendimento:\n\n` +
+      `1. 😔 Péssimo\n` +
+      `2. 🙁 Ruim\n` +
+      `3. 😐 Regular\n` +
+      `4. 😀 Bom\n` +
+      `5. 🤩 Excelente\n` +
+      `9. ❌ Não avaliar\n\n` +
+      `_Digite o número correspondente à sua nota:_`;
+
+    try {
+      await this.sendMessage(phone, csatMenu);
+      await this.ticketService.addArticle(
+        ticket.id,
+        `⭐ **Pesquisa de Satisfação (CSAT) enviada via WhatsApp.**\n\n${csatMenu}`,
+        'whatsapp',
+        true,
+        1
+      );
+    } catch (err) {
+      this.logger.error('Erro ao enviar pesquisa CSAT no WhatsApp', err);
+    }
+  }
+
+  private async getOrCreateGroupByName(name: string): Promise<Group> {
+    let group = await this.groupRepository.findOne({ where: { name } });
+    if (!group) {
+      group = this.groupRepository.create({ name, description: `Fila de ${name}` });
+      group = await this.groupRepository.save(group);
+    }
+    return group;
   }
 
   async handleIncomingMessage(fromPhone: string, profileName: string, text: string, phoneNumberId: string, media?: any) {
     this.logger.log(`Received WhatsApp message from ${fromPhone}: ${text} (Media: ${!!media})`);
+    const trimmed = (text || '').trim();
 
-    // 1. Find or create user
-    let user = await this.userRepository.findOne({ where: { phone: fromPhone } });
-    if (!user) {
-      // Create new customer user
-      const tempEmail = `${fromPhone}@whatsapp.local`;
-      const passwordHash = await bcrypt.hash(fromPhone + process.env.JWT_SECRET, 10);
-      const customerRole = await this.roleRepository.findOne({ where: { name: 'customer' } });
-      const roles = customerRole ? [customerRole] : [];
-      
-      user = this.userRepository.create({
-        login: fromPhone,
-        firstname: profileName.split(' ')[0] || 'Cliente',
-        lastname: profileName.split(' ').slice(1).join(' ') || 'WhatsApp',
-        email: tempEmail,
-        phone: fromPhone,
-        password_hash: passwordHash,
-        roles
-      });
-      user = await this.userRepository.save(user);
-    }
-
-    // 2. Find active ticket for this user from WhatsApp
-    // Active states: 1(Triagem), 2(Aberto), 3(Em Atendimento), 4(Pendente), 6(Dúvida)
-    // 5(Resolvido) means closed, so we create a new one.
-    const activeTicket = await this.ticketService['ticketRepository'].findOne({
-      where: {
-        customer_id: user.id,
-        source: 'whatsapp',
-        state_id: In([1, 2, 3, 4, 6])
-      },
-      order: { created_at: 'DESC' }
-    });
+    // 1. Localiza ou cria o usuário cliente
+    const user = await this.getOrCreateCustomerUser(fromPhone, profileName);
 
     let attachments = [];
     if (media && media.id) {
       attachments = await this.downloadMedia(media);
     }
 
+    // 2. Verifica se o cliente está respondendo a uma pesquisa CSAT pendente
+    const pendingCsatTicket = await this.findPendingCsatTicket(user.id);
+    if (pendingCsatTicket) {
+      await this.handleCsatResponse(pendingCsatTicket, fromPhone, trimmed);
+      return;
+    }
+
+    // 3. Verifica se há chamado ativo para este cliente
+    let activeTicket = await this.findActiveWhatsAppTicket(user.id);
+
     if (activeTicket) {
-      // Add article to existing ticket
+      // Adiciona o artigo ao chamado ativo
       await this.ticketService.addArticle(activeTicket.id, text, 'whatsapp', false, user.id, attachments);
-      
-      // Se estava pendente(4) ou dúvida(6), volta para Aberto(2) ou Em Atendimento(3).
-      // Por enquanto vamos colocar Aberto(2).
-      if (activeTicket.state_id === 4 || activeTicket.state_id === 6) {
-        await this.ticketService.changeState(activeTicket.id, 2, user.id);
+
+      // Fluxo de URA se o chamado ainda está em Triagem (state_id = 1)
+      if (activeTicket.state_id === 1) {
+        if (trimmed === '#' || trimmed.toLowerCase() === 'finalizar') {
+          await this.ticketService.changeState(activeTicket.id, 5, user.id);
+          const byeMsg = `Atendimento finalizado com sucesso. Se precisar de algo mais, estamos à disposição! 👋`;
+          await this.sendMessage(fromPhone, byeMsg);
+          await this.ticketService.addArticle(activeTicket.id, `🔒 **Chat finalizado pelo cliente (#)**`, 'whatsapp', true, 1);
+          return;
+        }
+
+        if (['1', '2', '3'].includes(trimmed)) {
+          let targetGroupName = 'Suporte';
+          if (trimmed === '2') targetGroupName = 'Comercial';
+          if (trimmed === '3') targetGroupName = 'Financeiro';
+
+          const targetGroup = await this.getOrCreateGroupByName(targetGroupName);
+          activeTicket.group_id = targetGroup.id;
+          activeTicket.state_id = 2; // Aberto / Em Fila
+          await this.ticketService['ticketRepository'].save(activeTicket);
+
+          const position = await this.getQueuePosition(activeTicket.id, targetGroup.id);
+
+          const queueMsg =
+            `Opção selecionada: *${targetGroupName}*\n\n` +
+            `Enquanto você aguarda pelo atendimento, por favor explique com o máximo de detalhes o que você precisa. Isso irá agilizar muito o seu atendimento!\n\n` +
+            `📌 *Você é o ${position}° na fila de atendimento.*`;
+
+          await this.sendMessage(fromPhone, queueMsg);
+          await this.ticketService.addArticle(
+            activeTicket.id,
+            `📋 **Fila selecionada pelo cliente:** ${targetGroupName} (${position}º na fila)`,
+            'whatsapp',
+            true,
+            1
+          );
+          return;
+        }
+
+        // Se o cliente perguntar a posição na fila
+        if (trimmed.toLowerCase().includes('fila') || trimmed.toLowerCase().includes('posição')) {
+          const position = await this.getQueuePosition(activeTicket.id, activeTicket.group_id || 1);
+          await this.sendMessage(fromPhone, `📌 Sua posição atual na fila é: *${position}°*`);
+          return;
+        }
+      } else {
+        // Chamado já em andamento (state_id in [2, 3, 4, 6])
+        if (trimmed.toLowerCase().includes('fila') || trimmed.toLowerCase().includes('posição')) {
+          const position = await this.getQueuePosition(activeTicket.id, activeTicket.group_id || 1);
+          await this.sendMessage(fromPhone, `📌 Sua posição atual na fila é: *${position}°*`);
+          return;
+        }
+
+        // Se estava pendente(4) ou dúvida(6), volta para Aberto(2)
+        if (activeTicket.state_id === 4 || activeTicket.state_id === 6) {
+          await this.ticketService.changeState(activeTicket.id, 2, user.id);
+        }
       }
     } else {
-      // Create new ticket
+      // 4. Criação de Novo Chamado & Disparo da URA Interativa
       const ticketData = {
         title: `Atendimento WhatsApp - ${profileName}`,
         customer_id: user.id,
-        group_id: 1, // default group
-        priority_id: 2, // medium
-        state_id: 1, // Triagem for new WhatsApp tickets
-        source: 'whatsapp'
+        group_id: 1, // default Suporte
+        priority_id: 2, // Média
+        state_id: 1, // Triagem / URA
+        source: 'whatsapp',
       };
-      
+
       const created = await this.ticketService.createTicket(ticketData, text, [], attachments);
 
-      // Triagem Inteligente via IA / Base de Conhecimento
-      try {
-        const triage = await this.aiService.triageWhatsAppMessage(fromPhone, profileName, text);
-        if (triage && triage.replyText) {
-          await this.sendMessage(fromPhone, triage.replyText);
+      // Verificação de Horário Comercial do cliente/organização
+      let calendarType = 'standard_8_18';
+      if (user.organization_id) {
+        const userOrg = await this.userRepository.findOne({
+          where: { id: user.id },
+          relations: ['organization'],
+        });
+        if (userOrg?.organization?.calendar_type) {
+          calendarType = userOrg.organization.calendar_type;
+        }
+      }
+
+      const businessCheck = BusinessHoursUtil.isWithinBusinessHours(new Date(), calendarType);
+      if (!businessCheck.isOpen) {
+        const nextOpenStr = businessCheck.nextOpeningDate.toLocaleString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          weekday: 'short',
+          day: '2-digit',
+          month: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const scheduleDescription = calendarType === 'extended_8_21'
+          ? 'de Domingo a Domingo das 08h às 21h'
+          : 'de Segunda a Sexta das 08h às 18h';
+
+        const offHoursMsg = `Olá, ${profileName.split(' ')[0]}!\n\nNo momento estamos fora do nosso expediente comercial (${scheduleDescription}).\nSua mensagem foi registrada e o atendimento será iniciado no início do próximo expediente (${nextOpenStr}).`;
+
+        try {
+          await this.sendMessage(fromPhone, offHoursMsg);
           if (created && created.id) {
             await this.ticketService.addArticle(
               created.id,
-              `🤖 **Resposta Automática da IA:**\n${triage.replyText}`,
+              `⏰ **Aviso de Fora do Expediente:**\n${offHoursMsg}`,
               'whatsapp',
               true,
-              1
+              1,
             );
           }
+        } catch (err) {
+          this.logger.error('Erro ao enviar mensagem de fora do expediente', err);
+        }
+      }
+
+      // Envia o Menu da URA Interativa com Posição na Fila
+      const uraMenu =
+        `Olá, seja bem-vindo ao atendimento *DeskFlow*! 👋\n\n` +
+        `Nosso horário de atendimento é de segunda a sexta das 08h às 18h.\n` +
+        `(Para clientes com horário estendido, atendemos das 08h às 21h.)\n\n` +
+        `Escolha uma fila de atendimento para ser atendido:\n` +
+        `1 - Suporte\n` +
+        `2 - Comercial\n` +
+        `3 - Financeiro\n` +
+        `# - Finalizar o chat.`;
+
+      try {
+        await this.sendMessage(fromPhone, uraMenu);
+        if (created && created.id) {
+          await this.ticketService.addArticle(
+            created.id,
+            `🤖 **Menu URA Enviado ao Cliente:**\n${uraMenu}`,
+            'whatsapp',
+            true,
+            1,
+          );
         }
       } catch (err) {
-        this.logger.error('Erro na triagem de IA para WhatsApp', err);
+        this.logger.error('Erro ao enviar Menu URA WhatsApp', err);
       }
+    }
+  }
+
+  /**
+   * Gerencia a máquina de estados do CSAT em 2 Etapas
+   */
+  private async handleCsatResponse(ticket: Ticket, phone: string, responseText: string) {
+    if (ticket.csat_stage === 'PENDING_RATING') {
+      if (responseText === '9') {
+        ticket.csat_stage = 'COMPLETED';
+        ticket.satisfaction_answered_at = new Date();
+        await this.ticketService['ticketRepository'].save(ticket);
+        await this.sendMessage(phone, 'Agradecemos o seu contato. Caso precise de novo atendimento, estamos à disposição! 👋');
+        await this.ticketService.addArticle(ticket.id, '⭐ **CSAT:** Cliente optou por não avaliar.', 'whatsapp', true, 1);
+        return;
+      }
+
+      const scoreNum = parseInt(responseText, 10);
+      if ([1, 2, 3, 4, 5].includes(scoreNum)) {
+        ticket.satisfaction_score = scoreNum;
+        ticket.csat_stage = 'PENDING_FEEDBACK';
+        ticket.satisfaction_answered_at = new Date();
+        await this.ticketService['ticketRepository'].save(ticket);
+
+        const feedbackPrompt = 'Agradecemos a sua avaliação, por favor descreva o motivo que levou você a classificar esse atendimento ou digite 9 para encerrar sem um motivo.';
+        await this.sendMessage(phone, feedbackPrompt);
+        await this.ticketService.addArticle(
+          ticket.id,
+          `⭐ **CSAT Nota Recebida:** ${scoreNum}/5. Solicitado motivo/feedback ao cliente.`,
+          'whatsapp',
+          true,
+          1
+        );
+      } else {
+        await this.sendMessage(phone, 'Por favor, digite uma opção válida entre 1 e 5 para avaliar, ou 9 para não avaliar.');
+      }
+      return;
+    }
+
+    if (ticket.csat_stage === 'PENDING_FEEDBACK') {
+      if (responseText !== '9') {
+        ticket.satisfaction_comment = responseText;
+      }
+      ticket.csat_stage = 'COMPLETED';
+      ticket.satisfaction_answered_at = new Date();
+      await this.ticketService['ticketRepository'].save(ticket);
+
+      const thanksMsg = 'Agradecemos o seu feedback! Sua opinião é fundamental para continuarmos evoluindo o nosso atendimento. Tenha um excelente dia! ✨';
+      await this.sendMessage(phone, thanksMsg);
+      await this.ticketService.addArticle(
+        ticket.id,
+        `⭐ **CSAT Concluído:** Nota ${ticket.satisfaction_score}/5${ticket.satisfaction_comment ? ` | Comentário: "${ticket.satisfaction_comment}"` : ' | Sem comentário adicional.'}`,
+        'whatsapp',
+        true,
+        1
+      );
     }
   }
 
@@ -180,7 +371,6 @@ export class WhatsappService {
       const token = await this.settingsService.getSetting('whatsapp_token');
       if (!token) return [];
 
-      // 1. Get Media URL
       const mediaInfoUrl = `${GRAPH_API_BASE}/${media.id}`;
       const infoResponse = await firstValueFrom(this.httpService.get(mediaInfoUrl, {
         headers: { Authorization: `Bearer ${token}` }
@@ -189,13 +379,11 @@ export class WhatsappService {
       const downloadUrl = infoResponse.data.url;
       const mimeType = infoResponse.data.mime_type || media.mime_type;
       
-      // 2. Download binary data
       const downloadResponse = await firstValueFrom(this.httpService.get(downloadUrl, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'arraybuffer'
       }));
 
-      // 3. Save locally
       const uploadDir = path.join(process.cwd(), 'uploads', 'whatsapp');
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
@@ -257,7 +445,6 @@ export class WhatsappService {
     }
 
     try {
-      // 1. Upload media to WhatsApp API
       const FormData = require('form-data');
       const formData = new FormData();
       formData.append('file', fs.createReadStream(filePath));
@@ -275,7 +462,6 @@ export class WhatsappService {
       );
       const mediaId = uploadResponse.data.id;
 
-      // 2. Send the message with the media
       let messageType = 'document';
       if (mimeType.startsWith('image/')) messageType = 'image';
       else if (mimeType.startsWith('video/')) messageType = 'video';
@@ -304,7 +490,6 @@ export class WhatsappService {
       }));
       this.logger.log(`WhatsApp media message sent to ${toPhone}`);
       
-      // se houver texto num áudio, envia o texto como mensagem separada
       if (text && messageType === 'audio') {
         await this.sendMessage(toPhone, text);
       }

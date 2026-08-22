@@ -2,6 +2,11 @@
 import { ref, onMounted } from 'vue';
 import { Plus as PlusIcon, Edit2 as Edit2Icon, Trash2 as Trash2Icon, BookOpen as BookOpenIcon, Folder as FolderIcon } from 'lucide-vue-next';
 import { kbAdminService, type Category, type Article } from '../../services/kbAdminService';
+import { useToast } from '@/composables/useToast';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { success: toastSuccess, error: toastError } = useToast();
+const { confirm: dialogConfirm } = useConfirm();
 
 const activeTab = ref('articles'); // 'articles' or 'categories'
 
@@ -31,7 +36,7 @@ const loadData = async () => {
     categories.value = await kbAdminService.getCategories();
     articles.value = await kbAdminService.getArticles();
   } catch (error) {
-    alert('Falha ao carregar os dados da Base de Conhecimento');
+    toastError('Erro', 'Falha ao carregar os dados da Base de Conhecimento.');
   } finally {
     isLoading.value = false;
   }
@@ -54,24 +59,34 @@ const saveCategory = async () => {
   try {
     if (editingCategory.value) {
       await kbAdminService.updateCategory(editingCategory.value.id, categoryForm.value);
+      toastSuccess('Sucesso', 'Categoria atualizada com sucesso.');
     } else {
       await kbAdminService.createCategory(categoryForm.value);
+      toastSuccess('Sucesso', 'Categoria criada com sucesso.');
     }
     showCategoryModal.value = false;
     await loadData();
   } catch (error) {
-    alert('Falha ao salvar categoria');
+    toastError('Erro', 'Falha ao salvar categoria.');
   }
 };
 
 const deleteCategory = async (id: number) => {
-  if (confirm('Tem certeza? Os artigos desta categoria perderão a categoria.')) {
-    try {
-      await kbAdminService.deleteCategory(id);
-      await loadData();
-    } catch (error) {
-      alert('Falha ao excluir categoria');
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Categoria',
+    message: 'Tem certeza? Os artigos vinculados a esta categoria passarão a ficar sem categoria.',
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  });
+  if (!ok) return;
+
+  try {
+    await kbAdminService.deleteCategory(id);
+    toastSuccess('Sucesso', 'Categoria excluída com sucesso.');
+    await loadData();
+  } catch (error) {
+    toastError('Erro', 'Falha ao excluir categoria.');
   }
 };
 
@@ -98,24 +113,34 @@ const saveArticle = async () => {
   try {
     if (editingArticle.value) {
       await kbAdminService.updateArticle(editingArticle.value.id, articleForm.value);
+      toastSuccess('Sucesso', 'Artigo atualizado com sucesso.');
     } else {
       await kbAdminService.createArticle(articleForm.value);
+      toastSuccess('Sucesso', 'Artigo criado com sucesso.');
     }
     showArticleModal.value = false;
     await loadData();
   } catch (error) {
-    alert('Falha ao salvar artigo');
+    toastError('Erro', 'Falha ao salvar artigo.');
   }
 };
 
 const deleteArticle = async (id: number) => {
-  if (confirm('Tem certeza que deseja excluir este artigo?')) {
-    try {
-      await kbAdminService.deleteArticle(id);
-      await loadData();
-    } catch (error) {
-      alert('Falha ao excluir artigo');
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Artigo',
+    message: 'Tem certeza que deseja excluir este artigo da Base de Conhecimento?',
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  });
+  if (!ok) return;
+
+  try {
+    await kbAdminService.deleteArticle(id);
+    toastSuccess('Sucesso', 'Artigo excluído com sucesso.');
+    await loadData();
+  } catch (error) {
+    toastError('Erro', 'Falha ao excluir artigo.');
   }
 };
 

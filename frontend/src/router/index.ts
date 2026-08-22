@@ -99,6 +99,12 @@ const router = createRouter({
           component: () => import('../views/ContactsView.vue'),
         },
         {
+          path: 'calendar',
+          name: 'calendar',
+          component: () => import('../views/CalendarView.vue'),
+          meta: { requiresAuth: true }
+        },
+        {
           path: 'admin/users',
           name: 'admin-users',
           component: () => import('../views/admin/UsersView.vue'),
@@ -180,6 +186,12 @@ const router = createRouter({
           path: 'admin/audit',
           name: 'admin-audit',
           component: () => import('../views/admin/AuditLogsView.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'admin/inventory',
+          name: 'admin-inventory',
+          component: () => import('../views/admin/InventoryView.vue'),
           meta: { requiresAdmin: true }
         }
       ]

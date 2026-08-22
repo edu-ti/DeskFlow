@@ -35,6 +35,11 @@ export class AnalyticsController {
     return this.analyticsService.getAgentProductivity(period, groupId);
   }
 
+  @Get('executive-ranking')
+  getExecutiveRanking(@Query('period') period: string, @Query('groupId') groupId: string) {
+    return this.analyticsService.getExecutiveRanking(period, groupId);
+  }
+
   @Get('export')
   async exportCsv(@Query('period') period: string, @Query('groupId') groupId: string) {
     const csv = await this.analyticsService.exportCsv(period, groupId);

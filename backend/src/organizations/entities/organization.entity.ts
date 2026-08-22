@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../iam/entities/user.entity';
+import { SlaPolicy } from '../../sla/entities/sla-policy.entity';
 
 @Entity('organizations')
 export class Organization {
@@ -14,6 +15,16 @@ export class Organization {
 
   @Column({ nullable: true })
   cnpj: string;
+
+  @Column({ type: 'varchar', default: 'standard_8_18' })
+  calendar_type: string; // 'standard_8_18' | 'extended_8_21'
+
+  @Column({ name: 'sla_policy_id', type: 'int', nullable: true })
+  sla_policy_id: number | null;
+
+  @ManyToOne(() => SlaPolicy, { nullable: true })
+  @JoinColumn({ name: 'sla_policy_id' })
+  sla_policy: SlaPolicy;
 
   @Column({ nullable: true })
   note: string;

@@ -6,6 +6,10 @@ export class CreateSlaPolicyDto {
   name: string;
 
   @IsOptional()
+  @IsString()
+  calendar_type?: string;
+
+  @IsOptional()
   @IsNumber()
   priority_id?: number | null;
 
@@ -20,6 +24,10 @@ export class CreateSlaPolicyDto {
   resolution_mins: number;
 
   @IsOptional()
+  @IsNumber()
+  onsite_resolution_mins?: number;
+
+  @IsOptional()
   @IsBoolean()
   is_active?: boolean;
 }
@@ -29,6 +37,10 @@ export class UpdateSlaPolicyDto {
   @IsString()
   @IsNotEmpty()
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  calendar_type?: string;
 
   @IsOptional()
   @IsNumber()
@@ -45,6 +57,10 @@ export class UpdateSlaPolicyDto {
   @IsOptional()
   @IsNumber()
   resolution_mins?: number;
+
+  @IsOptional()
+  @IsNumber()
+  onsite_resolution_mins?: number;
 
   @IsOptional()
   @IsBoolean()

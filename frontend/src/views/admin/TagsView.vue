@@ -97,8 +97,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Tag as TagIcon, Plus as TagPlusIcon, Search as SearchIcon, Edit2 as Edit2Icon, X as XIcon, Loader2 as Loader2Icon } from 'lucide-vue-next'
 import { tagsService } from '../../services/tagsService'
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+
+const { success: toastSuccess, error: toastError } = useToast()
+const { confirm: dialogConfirm } = useConfirm()
 
 const tags = ref<any[]>([])
 const isLoading = ref(true)
@@ -146,27 +150,38 @@ const saveTag = async () => {
   try {
     if (editingTag.value) {
       await tagsService.update(editingTag.value.id, form.value)
+      toastSuccess('Sucesso', 'Etiqueta atualizada com sucesso.')
     } else {
       await tagsService.create(form.value)
+      toastSuccess('Sucesso', 'Etiqueta criada com sucesso.')
     }
     closeModal()
     await loadData()
   } catch (e) {
     console.error('Erro ao salvar etiqueta:', e)
-    alert('Erro ao salvar etiqueta.')
+    toastError('Erro', 'Erro ao salvar etiqueta.')
   } finally {
     isSubmitting.value = false
   }
 }
 
 const deleteTag = async (id: number) => {
-  if (confirm('Excluir esta etiqueta?')) {
-    try {
-      await tagsService.remove(id)
-      await loadData()
-    } catch (e) {
-      console.error('Erro ao excluir etiqueta:', e)
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Etiqueta',
+    message: 'Tem certeza que deseja excluir esta etiqueta?',
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  })
+  if (!ok) return
+
+  try {
+    await tagsService.remove(id)
+    toastSuccess('Sucesso', 'Etiqueta excluída com sucesso.')
+    await loadData()
+  } catch (e) {
+    console.error('Erro ao excluir etiqueta:', e)
+    toastError('Erro', 'Não foi possível excluir a etiqueta.')
   }
 }
 </script>

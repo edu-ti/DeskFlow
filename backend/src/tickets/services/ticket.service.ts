@@ -10,12 +10,14 @@ import { TicketLink } from '../entities/ticket-link.entity';
 import { TicketCustomFieldValue } from '../entities/ticket-custom-field-value.entity';
 import { TicketCreatedEvent } from '../events/ticket-created.event';
 import { User } from '../../iam/entities/user.entity';
+import { Organization } from '../../organizations/entities/organization.entity';
 import { SLA_QUEUE_NAME, SlaJobData } from '../../sla/sla-queue.consumer';
 import { BusinessHoursUtil } from '../../sla/business-hours.util';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { SmtpService } from '../../email/services/smtp.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SlaPoliciesService } from '../../sla/services/sla-policies.service';
+import { SlaPolicy } from '../../sla/entities/sla-policy.entity';
 import { WhatsappService } from '../../whatsapp/whatsapp.service';
 
 @Injectable()
@@ -31,6 +33,8 @@ export class TicketService {
     private readonly linkRepository: Repository<TicketLink>,
     @InjectRepository(TicketCustomFieldValue)
     private readonly customFieldValueRepository: Repository<TicketCustomFieldValue>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @InjectQueue(SLA_QUEUE_NAME)
     private readonly slaQueue: Queue,
     private readonly notificationsService: NotificationsService,
@@ -42,28 +46,79 @@ export class TicketService {
     private readonly whatsappService: WhatsappService,
   ) {}
 
+  /**
+   * Resolve o SLA e o calendário apropriado para um chamado com base no cliente/organização e na política ativa.
+   */
+  async resolveSlaForTicket(ticketData: Partial<Ticket>, baseDate: Date = new Date()): Promise<{
+    firstResponseAt: Date;
+    solutionAt: Date;
+    onsiteAt: Date;
+    calendarType: string;
+    matchedPolicy: SlaPolicy | null;
+  }> {
+    let calendarType = 'standard_8_18';
+    let matchedPolicy: SlaPolicy | null = null;
+
+    // 1. Tenta carregar o cliente e sua organização se existir
+    if (ticketData.customer_id) {
+      const customer = await this.userRepository.findOne({
+        where: { id: ticketData.customer_id },
+        relations: { organization: { sla_policy: true } as any },
+      });
+
+      if (customer?.organization) {
+        if (customer.organization.calendar_type) {
+          calendarType = customer.organization.calendar_type;
+        }
+        if (customer.organization.sla_policy && customer.organization.sla_policy.is_active) {
+          matchedPolicy = customer.organization.sla_policy;
+        }
+      }
+    }
+
+    // 2. Se não houver política fixa na organização, busca por prioridade e grupo
+    if (!matchedPolicy) {
+      matchedPolicy = await this.slaPoliciesService.getMatchingPolicy(
+        ticketData.priority_id || 2,
+        ticketData.group_id,
+      );
+    }
+
+    if (matchedPolicy) {
+      if (matchedPolicy.calendar_type && !ticketData.customer_id) {
+        calendarType = matchedPolicy.calendar_type;
+      }
+      const firstMins = matchedPolicy.first_response_mins || 60; // 1h útil
+      const solMins = matchedPolicy.resolution_mins || 240;      // 4h úteis
+      const onsiteMins = matchedPolicy.onsite_resolution_mins || 480; // 8h úteis
+
+      return {
+        firstResponseAt: BusinessHoursUtil.addMinutes(baseDate, firstMins, 'America/Sao_Paulo', calendarType),
+        solutionAt: BusinessHoursUtil.addMinutes(baseDate, solMins, 'America/Sao_Paulo', calendarType),
+        onsiteAt: BusinessHoursUtil.addMinutes(baseDate, onsiteMins, 'America/Sao_Paulo', calendarType),
+        calendarType,
+        matchedPolicy,
+      };
+    }
+
+    // Fallback padrão se não houver política cadastrada
+    return {
+      firstResponseAt: BusinessHoursUtil.addMinutes(baseDate, 60, 'America/Sao_Paulo', calendarType),
+      solutionAt: BusinessHoursUtil.addMinutes(baseDate, 240, 'America/Sao_Paulo', calendarType),
+      onsiteAt: BusinessHoursUtil.addMinutes(baseDate, 480, 'America/Sao_Paulo', calendarType),
+      calendarType,
+      matchedPolicy: null,
+    };
+  }
+
   async createTicket(data: Partial<Ticket>, initialArticleBody: string, customFields?: { field_id: number, value: string }[], attachments: any[] = []): Promise<Ticket> {
     const newTicket = this.ticketRepository.create(data);
     
-    // Busca política de SLA aplicável
-    const slaPolicy = await this.slaPoliciesService.getMatchingPolicy(
-      newTicket.priority_id,
-      newTicket.group_id
-    );
-
-    if (slaPolicy) {
-      newTicket.firstResponseEscalationAt = BusinessHoursUtil.addMinutes(new Date(), slaPolicy.first_response_mins);
-      newTicket.solutionEscalationAt = BusinessHoursUtil.addMinutes(new Date(), slaPolicy.resolution_mins);
-    } else {
-      // Fallback antigo caso não haja política
-      let slaHours = 8;
-      if (data.priority_id === 1) slaHours = 24;
-      else if (data.priority_id === 2) slaHours = 8;
-      else if (data.priority_id === 3) slaHours = 4;
-      else if (data.priority_id === 4) slaHours = 2;
-      
-      newTicket.firstResponseEscalationAt = BusinessHoursUtil.addBusinessHours(new Date(), slaHours);
-    }
+    // Resolve prazos com base no calendário de atendimento contratado
+    const slaTimes = await this.resolveSlaForTicket(newTicket, new Date());
+    newTicket.firstResponseEscalationAt = slaTimes.firstResponseAt;
+    newTicket.solutionEscalationAt = slaTimes.solutionAt;
+    newTicket.onsiteResolutionEscalationAt = slaTimes.onsiteAt;
 
     const savedTicket = await this.ticketRepository.save(newTicket);
 
@@ -138,15 +193,18 @@ export class TicketService {
       order: { 
         isEscalated: 'DESC',
         created_at: 'DESC' 
-      } 
+      },
+      relations: {
+        customer: true,
+        owner: true,
+        group: true,
+      }
     });
   }
 
   async getDashboardStats() {
-    const totalTickets = await this.ticketRepository.count();
     const openTickets = await this.ticketRepository.count({ where: { state_id: 2 } });
-    const closedTickets = await this.ticketRepository.count({ where: { state_id: 5 } });
-    const pendingTickets = await this.ticketRepository.count({ where: { state_id: 4 } });
+    const pendingTickets = await this.ticketRepository.count({ where: { state_id: 3 } });
     const escalatedTickets = await this.ticketRepository.count({ where: { isEscalated: true } });
     
     // Recent 7 days activity
@@ -195,7 +253,9 @@ export class TicketService {
     const ticket = await this.ticketRepository.findOne({
       where: { id },
       relations: {
-        customer: true,
+        customer: {
+          organization: true,
+        } as any,
         owner: true,
         group: true,
         articles: true,
@@ -260,32 +320,48 @@ export class TicketService {
       await this.notificationsService.createNotification(
         ticket.owner_id,
         'Nova Interação',
-        `Nova mensagem no chamado #${ticket.id}`,
+        `Nova resposta no chamado #${ticket.id} (${ticket.title})`,
         'ticket_updated',
         ticket.id,
       );
     }
-    
-    if (!is_internal && ticket.customer_id && ticket.customer_id !== actorUserId) {
-       const ticketWithCustomer = await this.ticketRepository.findOne({ where: { id: ticketId }, relations: { customer: true } });
-       if (ticketWithCustomer && ticketWithCustomer.customer) {
-         if (ticketWithCustomer.source === 'whatsapp' && ticketWithCustomer.customer.phone) {
-           if (attachments && attachments.length > 0 && attachments[0].localPath) {
-             const att = attachments[0];
-             await this.whatsappService.sendMediaMessage(ticketWithCustomer.customer.phone, body, att.localPath, att.mimetype, att.filename);
-           } else if (body) {
-             await this.whatsappService.sendMessage(ticketWithCustomer.customer.phone, body);
-           }
-         } else {
-           await this.smtpService.sendTicketReplyEmail(ticketWithCustomer, savedArticle, ticketWithCustomer.customer);
-         }
-       }
+
+    // Se o artigo for publico (resposta do agente), envia no WhatsApp se a origem for whatsapp
+    if (ticket.source === 'whatsapp' && !is_internal && type !== 'whatsapp') {
+      const customer = await this.userRepository.findOne({ where: { id: ticket.customer_id } });
+      if (customer && customer.phone) {
+        // Envia mensagem de texto no WhatsApp do cliente
+        if (body && body.trim().length > 0) {
+          await this.whatsappService.sendMessage(customer.phone, body);
+        }
+
+        // Se houver anexos gerados pelo atendente, envia as mídias para o WhatsApp do cliente
+        if (attachments && attachments.length > 0) {
+          for (const att of attachments) {
+            if (att.localPath && att.mimetype) {
+              await this.whatsappService.sendMediaMessage(
+                customer.phone,
+                att.localPath,
+                att.mimetype,
+                att.filename
+              );
+            }
+          }
+        }
+      }
     }
+
+    // Disparar evento no barramento (BR-CORE-004)
+    this.eventEmitter.emit('article.created', {
+      article: savedArticle,
+      ticket,
+      actorUserId
+    });
 
     return savedArticle;
   }
 
-  async changeState(ticketId: number, newStateId: number, actorUserId: number): Promise<Ticket> {
+  async changeState(ticketId: number, newStateId: number, actorUserId: number = 1): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
     if (!ticket) {
       throw new NotFoundException('Ticket not found');
@@ -295,51 +371,17 @@ export class TicketService {
     if (oldState !== newStateId) {
       ticket.state_id = newStateId;
 
-      // Se mudou para Resolvido (5) e ainda não tem token de CSAT, gera um
-      if (newStateId === 5 && !ticket.csat_token) {
-        ticket.csat_token = require('crypto').randomUUID();
-        
-        if (ticket.source === 'email' || ticket.source === 'web') {
-          // Enviar por E-mail
-          if (ticket.customer_id) {
-            const tFull = await this.ticketRepository.findOne({ where: { id: ticket.id }, relations: { customer: true } });
-            if (tFull && tFull.customer) {
-              await this.smtpService.sendCsatEmail(tFull, tFull.customer);
-            }
-          }
-        } else if (ticket.source === 'whatsapp') {
-          // TODO: Enviar pesquisa CSAT via WhatsApp (será implementado no módulo Omnichannel)
-        }
-      }
-
-      // BR-MIGRAR-002: Lógica de Pausa de SLA
-      const isPauseState = (newStateId === 4 || newStateId === 6); // Pendente ou Dúvida
-      const wasPauseState = (oldState === 4 || oldState === 6);
-      
-      if (isPauseState && !wasPauseState) {
-        // Entrou em Pausa
-        if (!ticket.sla_paused_at) {
-          ticket.sla_paused_at = new Date();
-          await this.removeSlaJobs(ticket.id);
-        }
-      } else if (!isPauseState && wasPauseState) {
-        // Saiu da Pausa
-        if (ticket.sla_paused_at) {
-          const pausedMillis = new Date().getTime() - ticket.sla_paused_at.getTime();
-          if (ticket.firstResponseEscalationAt) {
-            ticket.firstResponseEscalationAt = new Date(ticket.firstResponseEscalationAt.getTime() + pausedMillis);
-          }
-          if (ticket.solutionEscalationAt) {
-            ticket.solutionEscalationAt = new Date(ticket.solutionEscalationAt.getTime() + pausedMillis);
-          }
-          ticket.sla_paused_at = null as any;
-          await this.scheduleSlaJobs(ticket);
-        }
-      }
-
-      if (newStateId === 5) {
+      if (newStateId === 5 || newStateId === 6) {
         // Removendo jobs de SLA ao fechar/resolver
         await this.removeSlaJobs(ticket.id);
+
+        // Dispara Pesquisa de Satisfação CSAT para chamados originados do WhatsApp
+        if (ticket.source === 'whatsapp' && ticket.customer_id) {
+          const customer = await this.userRepository.findOne({ where: { id: ticket.customer_id } });
+          if (customer && customer.phone) {
+            await this.whatsappService.sendCsatSurvey(ticket.id, customer.phone);
+          }
+        }
       }
 
       await this.ticketRepository.save(ticket);
@@ -397,6 +439,19 @@ export class TicketService {
     if (oldGroup !== groupId || oldOwner !== ownerId) {
       ticket.group_id = groupId;
       ticket.owner_id = ownerId as any;
+
+      // Recalcula SLA se o grupo mudar
+      if (oldGroup !== groupId) {
+        const slaTimes = await this.resolveSlaForTicket(ticket, ticket.created_at || new Date());
+        if (!ticket.firstResponseEscalationAt || ticket.state_id === 1) {
+          ticket.firstResponseEscalationAt = slaTimes.firstResponseAt;
+        }
+        ticket.solutionEscalationAt = slaTimes.solutionAt;
+        ticket.onsiteResolutionEscalationAt = slaTimes.onsiteAt;
+        await this.removeSlaJobs(ticket.id);
+        await this.scheduleSlaJobs(ticket);
+      }
+
       await this.ticketRepository.save(ticket);
       
       // Registrar no histórico a mudança de grupo
@@ -429,17 +484,37 @@ export class TicketService {
     return ticket;
   }
 
-  private async addHistory(ticketId: number, userId: number, field: string, oldValue: string, newValue: string) {
+  async changeTitle(ticketId: number, title: string, actorUserId: number): Promise<Ticket> {
+    const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    const oldTitle = ticket.title;
+    if (oldTitle !== title) {
+      ticket.title = title;
+      await this.ticketRepository.save(ticket);
+      await this.addHistory(ticketId, actorUserId, 'title', oldTitle, title);
+
+      this.eventEmitter.emit('ticket.updated', {
+        ticket,
+        changedFields: { title: { old: oldTitle, new: title } }
+      });
+    }
+
+    return ticket;
+  }
+
+  private async addHistory(ticketId: number, userId: number, field: string, oldValue: string | null, newValue: string | null) {
     const history = this.historyRepository.create({
       ticket_id: ticketId,
       user_id: userId,
       field,
       old_value: oldValue,
-      new_value: newValue
+      new_value: newValue,
     });
     await this.historyRepository.save(history);
   }
-
 
   async changePriority(ticketId: number, priorityId: number, actorUserId: number = 1): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
@@ -449,16 +524,16 @@ export class TicketService {
     if (oldPriority !== priorityId) {
       ticket.priority_id = priorityId;
 
-      // Recalcular SLA baseado na nova prioridade
-      const slaPolicy = await this.slaPoliciesService.getMatchingPolicy(priorityId, ticket.group_id);
-      if (slaPolicy && slaPolicy.is_active) {
-        if (!ticket.firstResponseEscalationAt || ticket.state_id === 1) {
-          ticket.firstResponseEscalationAt = BusinessHoursUtil.addMinutes(ticket.created_at, slaPolicy.first_response_mins);
-        }
-        ticket.solutionEscalationAt = BusinessHoursUtil.addMinutes(ticket.created_at, slaPolicy.resolution_mins);
-        await this.removeSlaJobs(ticket.id);
-        await this.scheduleSlaJobs(ticket);
+      // Recalcular SLA baseado na nova prioridade e no calendário da empresa
+      const slaTimes = await this.resolveSlaForTicket(ticket, ticket.created_at || new Date());
+      if (!ticket.firstResponseEscalationAt || ticket.state_id === 1) {
+        ticket.firstResponseEscalationAt = slaTimes.firstResponseAt;
       }
+      ticket.solutionEscalationAt = slaTimes.solutionAt;
+      ticket.onsiteResolutionEscalationAt = slaTimes.onsiteAt;
+      
+      await this.removeSlaJobs(ticket.id);
+      await this.scheduleSlaJobs(ticket);
 
       await this.ticketRepository.save(ticket);
       await this.addHistory(ticketId, actorUserId, 'priority_id', oldPriority?.toString(), priorityId.toString());
@@ -470,6 +545,37 @@ export class TicketService {
     return ticket;
   }
 
+  async changeServiceType(ticketId: number, serviceType: string, actorUserId: number = 1): Promise<Ticket> {
+    const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
+    if (!ticket) throw new NotFoundException('Ticket not found');
+
+    const oldType = ticket.service_type;
+    if (oldType !== serviceType) {
+      ticket.service_type = serviceType;
+
+      const slaTimes = await this.resolveSlaForTicket(ticket, ticket.created_at || new Date());
+      ticket.onsiteResolutionEscalationAt = slaTimes.onsiteAt;
+
+      await this.ticketRepository.save(ticket);
+      await this.addHistory(ticketId, actorUserId, 'service_type', oldType, serviceType);
+
+      await this.addArticle(
+        ticketId,
+        `Tipo de atendimento alterado para: **${serviceType === 'onsite' ? 'Atendimento Presencial' : 'Atendimento Remoto'}**`,
+        'note',
+        true,
+        actorUserId
+      );
+
+      this.eventEmitter.emit('ticket.updated', {
+        ticket,
+        changedFields: { service_type: { old: oldType, new: serviceType } }
+      });
+    }
+
+    return ticket;
+  }
+
   async changeGroup(ticketId: number, groupId: number, actorUserId: number = 1): Promise<Ticket> {
     return this.transferTicket(ticketId, groupId, null, 'Alteração automática de grupo', actorUserId);
   }
@@ -478,75 +584,46 @@ export class TicketService {
     await this.ticketRepository.softDelete(ticketId);
   }
 
-
-  async changeTitle(ticketId: number, newTitle: string, actorUserId: number): Promise<Ticket> {
-    const ticket = await this.ticketRepository.findOne({ where: { id: ticketId } });
-    if (!ticket) {
-      throw new NotFoundException('Ticket not found');
-    }
-
-    const oldTitle = ticket.title;
-    if (oldTitle !== newTitle) {
-      ticket.title = newTitle;
-      await this.ticketRepository.save(ticket);
-      
-      await this.addHistory(ticketId, actorUserId, 'title', oldTitle, newTitle);
-      
-      this.eventEmitter.emit('ticket.updated', {
-        ticket,
-        changedFields: { title: { old: oldTitle, new: newTitle } }
-      });
-    }
-
-    return ticket;
-  }
-
   async mergeTickets(sourceTicketId: number, targetTicketId: number, actorUserId: number): Promise<void> {
-    if (sourceTicketId === targetTicketId) {
-      throw new Error('Cannot merge a ticket into itself');
-    }
-
-    const sourceTicket = await this.ticketRepository.findOne({ where: { id: sourceTicketId }, relations: { articles: true } });
+    const sourceTicket = await this.ticketRepository.findOne({
+      where: { id: sourceTicketId },
+      relations: { articles: true }
+    });
     const targetTicket = await this.ticketRepository.findOne({ where: { id: targetTicketId } });
 
     if (!sourceTicket || !targetTicket) {
       throw new NotFoundException('One or both tickets not found');
     }
 
-    // 1. Migrate articles
-    await this.articleRepository.update({ ticket: { id: sourceTicketId } }, { ticket: { id: targetTicketId } });
+    // 1. Move all articles from source to target
+    if (sourceTicket.articles && sourceTicket.articles.length > 0) {
+      for (const article of sourceTicket.articles) {
+        article.ticket_id = targetTicketId;
+        await this.articleRepository.save(article);
+      }
+    }
 
-    // 2. Add Internal Notes
+    // 2. Add merge note to target
     await this.addArticle(
       targetTicketId,
-      `Chamado #${sourceTicketId} foi mesclado a este chamado.`,
+      `Chamado #${sourceTicketId} mesclado neste chamado.`,
       'note',
       true, // internal
       actorUserId
     );
 
+    // 3. Close source ticket with state_id = 5 (Fechado/Resolvido)
+    await this.changeState(sourceTicketId, 5, actorUserId);
     await this.addArticle(
       sourceTicketId,
-      `Chamado mesclado ao Ticket #${targetTicketId}.`,
+      `Chamado mesclado no chamado #${targetTicketId} e fechado automaticamente.`,
       'note',
-      true,
+      true, // internal
       actorUserId
     );
-
-    // 3. Close source ticket
-    sourceTicket.state_id = 5; // Resolvido/Mesclado
-    await this.ticketRepository.save(sourceTicket);
-
-    this.eventEmitter.emit('ticket.updated', {
-      ticket: targetTicket,
-    });
   }
 
   async linkTickets(sourceTicketId: number, targetTicketId: number, actorUserId: number): Promise<TicketLink> {
-    if (sourceTicketId === targetTicketId) {
-      throw new Error('Cannot link a ticket to itself');
-    }
-
     const sourceTicket = await this.ticketRepository.findOne({ where: { id: sourceTicketId } });
     const targetTicket = await this.ticketRepository.findOne({ where: { id: targetTicketId } });
 
@@ -710,5 +787,4 @@ export class TicketService {
       }
     }
   }
-
 }

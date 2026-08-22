@@ -161,6 +161,9 @@ import { useRouter } from 'vue-router'
 import { Plus as PlusIcon, Inbox as InboxIcon, Loader2 as Loader2Icon, X as XIcon, AlertCircle as AlertCircleIcon, Clock as ClockIcon } from 'lucide-vue-next'
 import { ticketService } from '../services/ticketService'
 import { customFieldsService, type CustomField } from '../services/customFieldsService'
+import { useToast } from '@/composables/useToast'
+
+const { success: toastSuccess, error: toastError } = useToast()
 
 const router = useRouter()
 const tickets = ref<any[]>([])
@@ -241,12 +244,13 @@ const handleCreateTicket = async () => {
     newTicket.value = { title: '', initial_article_body: '' }
     customFieldValues.value = {}
     showCreateModal.value = false
+    toastSuccess('Sucesso', 'Chamado criado com sucesso!')
     
     // Refresh list
     await fetchTickets()
   } catch (error) {
     console.error("Failed to create ticket", error)
-    alert("Não foi possível criar o chamado. Verifique a conexão com o servidor.")
+    toastError('Erro', 'Não foi possível criar o chamado. Verifique a conexão com o servidor.')
   } finally {
     isSubmitting.value = false
   }

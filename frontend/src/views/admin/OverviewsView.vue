@@ -107,6 +107,11 @@
 import { ref, onMounted } from 'vue'
 import { Plus as PlusIcon, Layers as LayersIcon, Edit2 as Edit2Icon, Trash2 as Trash2Icon, X as XIcon, Loader2 as Loader2Icon } from 'lucide-vue-next'
 import { overviewsService } from '../../services/overviewsService'
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+
+const { success: toastSuccess, error: toastError } = useToast()
+const { confirm: dialogConfirm } = useConfirm()
 
 const overviews = ref<any[]>([])
 const isLoading = ref(true)
@@ -157,34 +162,45 @@ const save = async () => {
       try {
         payload.condition = JSON.parse(conditionText.value)
       } catch {
-        alert('Condição (JSON) inválida.')
+        toastError('Erro de Validação', 'A condição em formato JSON é inválida.')
         isSubmitting.value = false
         return
       }
     }
     if (editing.value) {
       await overviewsService.update(editing.value.id, payload)
+      toastSuccess('Sucesso', 'Visão atualizada com sucesso.')
     } else {
       await overviewsService.create(payload)
+      toastSuccess('Sucesso', 'Visão criada com sucesso.')
     }
     closeModal()
     await loadData()
   } catch (e) {
     console.error('Erro ao salvar visão:', e)
-    alert('Erro ao salvar visão.')
+    toastError('Erro', 'Erro ao salvar visão.')
   } finally {
     isSubmitting.value = false
   }
 }
 
 const deleteOverview = async (id: number) => {
-  if (confirm('Excluir esta visão?')) {
-    try {
-      await overviewsService.remove(id)
-      await loadData()
-    } catch (e) {
-      console.error('Erro ao excluir visão:', e)
-    }
+  const ok = await dialogConfirm({
+    title: 'Excluir Visão',
+    message: 'Tem certeza que deseja excluir esta visão?',
+    type: 'danger',
+    confirmText: 'Sim, Excluir',
+    cancelText: 'Cancelar',
+  })
+  if (!ok) return
+
+  try {
+    await overviewsService.remove(id)
+    toastSuccess('Sucesso', 'Visão excluída com sucesso.')
+    await loadData()
+  } catch (e) {
+    console.error('Erro ao excluir visão:', e)
+    toastError('Erro', 'Não foi possível excluir a visão.')
   }
 }
 </script>

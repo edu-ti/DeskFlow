@@ -21,17 +21,29 @@ import { SlaPoliciesController } from '../sla/controllers/sla-policies.controlle
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EmailModule } from '../email/email.module';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
+import { User } from '../iam/entities/user.entity';
+import { Organization } from '../organizations/entities/organization.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Ticket, Article, TicketHistory, TicketLink, CustomField, TicketCustomFieldValue, SlaPolicy]),
+    TypeOrmModule.forFeature([
+      Ticket,
+      Article,
+      TicketHistory,
+      TicketLink,
+      CustomField,
+      TicketCustomFieldValue,
+      SlaPolicy,
+      User,
+      Organization,
+    ]),
     BullModule.registerQueue({
       name: SLA_QUEUE_NAME,
     }),
     NotificationsModule,
     forwardRef(() => EmailModule),
     forwardRef(() => WhatsappModule),
-    SearchModule
+    SearchModule,
   ],
   controllers: [TicketsController, CustomFieldsController, CsatController, SlaPoliciesController],
   providers: [TicketService, CustomFieldsService, SlaQueueConsumer, SlaPoliciesService, SlaWatchdogService],

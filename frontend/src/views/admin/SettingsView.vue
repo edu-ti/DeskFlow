@@ -451,9 +451,9 @@ const providers: Record<string, ProviderMeta> = {
   },
 }
 
-const currentProviderInfo = computed(() => {
+const currentProviderInfo = computed<ProviderMeta>(() => {
   const p = settings.value.AI_PROVIDER || 'openai'
-  return providers[p] || providers.openai
+  return (providers[p] || providers.openai) as ProviderMeta
 })
 
 const currentModels = computed(() => {
@@ -521,7 +521,7 @@ const saveSettings = async () => {
   try {
     // Sincroniza OPENAI_API_KEY para compatibilidade
     if (settings.value.AI_PROVIDER === 'openai') {
-      settings.value.OPENAI_API_KEY = settings.value.AI_API_KEY
+      settings.value.OPENAI_API_KEY = settings.value.AI_API_KEY || ''
     }
     await api.put('/settings', settings.value)
     toastSuccess('Sucesso', 'Configurações atualizadas com sucesso.')

@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router';
 import { Search as SearchIcon, Book as BookIcon, Folder as FolderIcon, ChevronRight as ChevronRightIcon } from 'lucide-vue-next';
 import { kbPublicService } from '../../services/kbPublicService';
 import type { Category, Article } from '../../services/kbAdminService';
+import { useToast } from '@/composables/useToast';
+
+const { error: toastError } = useToast();
 
 const router = useRouter();
 
@@ -24,7 +27,7 @@ const loadData = async () => {
     categories.value = await kbPublicService.getCategories();
     await performSearch();
   } catch (error) {
-    alert('Failed to load knowledge base');
+    toastError('Erro', 'Falha ao carregar a Base de Conhecimento.');
   } finally {
     isLoading.value = false;
   }
