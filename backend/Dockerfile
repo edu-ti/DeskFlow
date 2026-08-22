@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps --no-audit
 
 COPY tsconfig*.json nest-cli.json ./
 COPY src/ ./src/
@@ -15,14 +15,14 @@ COPY src/ ./src/
 RUN npm run build
 
 # Stage 2: Production
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
 RUN apk add --no-cache python3 make g++ curl
 
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev --legacy-peer-deps --no-audit && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 COPY scripts/ ./scripts/
