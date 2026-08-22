@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import axios from 'axios';
+import api from '../services/api';
 
 export interface Notification {
   id: number;
@@ -21,13 +21,8 @@ export const useNotificationsStore = defineStore('notifications', () => {
   });
 
   async function fetchNotifications() {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
     try {
-      const response = await axios.get('http://localhost:3000/notifications', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/notifications');
       notifications.value = response.data;
     } catch (e) {
       console.error('Failed to fetch notifications', e);
@@ -55,11 +50,8 @@ export const useNotificationsStore = defineStore('notifications', () => {
     if (notification && !notification.isRead) {
       notification.isRead = true;
       
-      const token = localStorage.getItem('token');
       try {
-        await axios.patch(`http://localhost:3000/notifications/${id}/read`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await api.patch(`/notifications/${id}/read`, {});
       } catch (e) {
         console.error('Failed to mark notification as read', e);
       }
@@ -71,11 +63,8 @@ export const useNotificationsStore = defineStore('notifications', () => {
       n.isRead = true;
     });
 
-    const token = localStorage.getItem('token');
     try {
-      await axios.patch(`http://localhost:3000/notifications/read-all`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.patch('/notifications/read-all', {});
     } catch (e) {
       console.error('Failed to mark all as read', e);
     }

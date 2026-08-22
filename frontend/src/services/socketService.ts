@@ -12,7 +12,8 @@ class SocketService {
       this.disconnect();
     }
 
-    this.socket = io('http://localhost:3000', {
+    const wsUrl = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || (import.meta.env.PROD ? window.location.origin : 'http://localhost:3000');
+    this.socket = io(wsUrl, {
       auth: {
         token: `Bearer ${token}`
       },
